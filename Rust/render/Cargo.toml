@@ -1,0 +1,23 @@
+[package]
+name = "onscripter-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+onscripter-core.workspace = true
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
+cosmic-text = { version = "0.19.0", default-features = false, features = ["std", "swash"] }
+swash = "0.2.10"
+unicode-linebreak = "0.1.5"
+sdl3-sys = { version = "0.7.2", default-features = false, features = ["no-default-subsystems", "sdl-video", "sdl-gpu", "sdl-render"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+sdl3 = { version = "0.20.0", features = ["build-from-source-static"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+sdl3 = "0.20.0"
+
+[lints]
+workspace = true

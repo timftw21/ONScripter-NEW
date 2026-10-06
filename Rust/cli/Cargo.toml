@@ -1,0 +1,14 @@
+[package]
+name = "onscripter-new-rust"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+onscripter-core.workspace = true
+onscripter-platform.workspace = true
+onscripter-render.workspace = true
+
+[lints]
+workspace = true

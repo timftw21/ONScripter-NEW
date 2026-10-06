@@ -1,0 +1,120 @@
+import groovy.json.JsonSlurper
+
+plugins { id 'com.android.application' version '9.2.0' }
+
+def repo = rootProject.file('../..')
+def cargo = System.getProperty('os.name').startsWith('Windows') ? 'cargo.exe' : 'cargo'
+def metadata = providers.exec {
+    workingDir repo
+    commandLine cargo, 'metadata', '--locked', '--format-version', '1'
+}.standardOutput.asText
+def cargoMetadata = new JsonSlurper().parseText(metadata.get())
+def packages = cargoMetadata.packages
+def workspacePackages = packages.findAll { cargoMetadata.workspace_members.contains(it.id) }
+def sdlPackage = packages.find { it.name == 'sdl3-src' }
+if (sdlPackage?.version != '3.4.18') { throw new GradleException('SDL Java/native version must match Cargo.lock (3.4.18).') }
+def sdl = new File(new File(sdlPackage.manifest_path).parentFile, 'SDL')
+def nativeBuild = layout.buildDirectory.dir('native').get().asFile
+def rustTarget = new File(repo, 'DerivedData/Rust/android')
+def libraries = layout.buildDirectory.dir('jniLibs').get().asFile
+
+android {
+    namespace = 'org.onscripter.rewrite'
+    compileSdk = 36
+    ndkVersion = '28.2.13676358'
+    defaultConfig {
+        applicationId = 'org.onscripter.rewrite'
+        minSdk = 30
+        targetSdk = 36
+        versionCode = 1
+        versionName = '0.1.0'
+        ndk { abiFilters 'arm64-v8a' }
+    }
+    sourceSets.main {
+        manifest.srcFile 'AndroidManifest.xml'
+        java.srcDirs = ['java', new File(sdl, 'android-project/app/src/main/java')]
+        jniLibs.srcDirs = [libraries]
+        assets.srcDirs = [layout.buildDirectory.dir('notices')]
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    buildTypes {
+        debug { debuggable = true; jniDebuggable = true }
+        release { debuggable = false; minifyEnabled = false }
+    }
+    packaging.jniLibs.useLegacyPackaging = false
+}
+
+def sdk = androidComponents.sdkComponents.sdkDirectory.get().asFile
+def ndk = new File(sdk, "ndk/${android.ndkVersion}")
+def windows = System.getProperty('os.name').startsWith('Windows')
+def host = windows ? 'windows-x86_64' : (System.getProperty('os.name').startsWith('Mac') ? 'darwin-x86_64' : 'linux-x86_64')
+def compiler = new File(ndk, "toolchains/llvm/prebuilt/${host}/bin/aarch64-linux-android30-clang${windows ? '.cmd' : ''}")
+
+def configureSdl = tasks.register('configureSdl', Exec) {
+    inputs.file 'CMakeLists.txt'
+    inputs.file 'build.gradle'
+    inputs.file new File(repo, 'Cargo.lock')
+    outputs.file new File(nativeBuild, 'CMakeCache.txt')
+    doFirst { if (!compiler.isFile()) { throw new GradleException("Install Android NDK ${android.ndkVersion} in ${sdk}.") } }
+    commandLine 'cmake', '-S', projectDir, '-B', nativeBuild, '-G', 'Ninja',
+        "-DCMAKE_TOOLCHAIN_FILE=${new File(ndk, 'build/cmake/android.toolchain.cmake')}",
+        '-DANDROID_ABI=arm64-v8a', '-DANDROID_PLATFORM=android-30',
+        '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON', '-DCMAKE_BUILD_TYPE=Release',
+        "-DSDL_SOURCE_DIR=${sdl}", '-DANDROID_STL=c++_static'
+}
+def buildSdl = tasks.register('buildSdl', Exec) {
+    dependsOn configureSdl
+    inputs.file new File(repo, 'Cargo.lock')
+    inputs.file 'CMakeLists.txt'
+    inputs.file new File(nativeBuild, 'CMakeCache.txt')
+    outputs.file new File(nativeBuild, 'SDL/libSDL3.so')
+    commandLine 'cmake', '--build', nativeBuild, '--parallel', '2'
+}
+def buildRust = tasks.register('buildRust', Exec) {
+    dependsOn buildSdl
+    workingDir repo
+    workspacePackages.each { pkg ->
+        def manifest = new File(pkg.manifest_path)
+        inputs.file manifest
+        inputs.files fileTree(new File(manifest.parentFile, 'src')) { include '**/*.rs' }
+        def buildScript = new File(manifest.parentFile, 'build.rs')
+        if (buildScript.isFile()) { inputs.file buildScript }
+    }
+    inputs.files new File(repo, 'Cargo.toml'), new File(repo, 'Cargo.lock'), new File(repo, 'rust-toolchain.toml'), new File(repo, '.cargo/config.toml')
+    inputs.file new File(nativeBuild, 'SDL/libSDL3.so')
+    outputs.file new File(rustTarget, 'aarch64-linux-android/release/libonscripter_android.so')
+    environment 'CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER', compiler.absolutePath
+    // Build in a separate target directory; desktop and Android artifacts never collide.
+    environment 'CARGO_TARGET_DIR', rustTarget.absolutePath
+    environment 'CARGO_ENCODED_RUSTFLAGS', ['-L', "native=${new File(nativeBuild, 'SDL')}", '-C', 'link-arg=-Wl,-z,max-page-size=16384', '-C', 'link-arg=-Wl,-z,common-page-size=16384'].join('\u001f')
+    commandLine cargo, 'build', '--release', '--locked', '--target', 'aarch64-linux-android', '-p', 'onscripter-android'
+}
+def stageLibraries = tasks.register('stageLibraries', Sync) {
+    dependsOn buildRust
+    from(new File(nativeBuild, 'SDL/libSDL3.so'))
+    from(new File(rustTarget, 'aarch64-linux-android/release/libonscripter_android.so'))
+    into new File(libraries, 'arm64-v8a')
+}
+tasks.named('preBuild') { dependsOn stageLibraries }
+
+def stageNotices = tasks.register('stageNotices', Sync) {
+    inputs.file new File(repo, 'Cargo.lock')
+    from(new File(repo,'LICENSE')) { into 'onscripter' }
+    from(new File(sdl,'LICENSE.txt')) { into 'SDL3' }
+    packages.each { pkg ->
+        from(new File(pkg.manifest_path).parentFile) {
+            include 'LICENSE*', 'COPYING*', 'NOTICE*'
+            into "${pkg.name}-${pkg.version}"
+        }
+    }
+    into layout.buildDirectory.dir('notices/licenses')
+}
+tasks.named('preBuild') { dependsOn stageNotices }
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.each { output -> output.outputFileName.set("onscripter-rust-${variant.name}.apk") }
+    }
+}

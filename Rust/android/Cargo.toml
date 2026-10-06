@@ -1,0 +1,19 @@
+[package]
+name = "onscripter-android"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "onscripter_android"
+crate-type = ["cdylib"]
+
+[target.'cfg(target_os = "android")'.dependencies]
+onscripter-core.workspace = true
+onscripter-render.workspace = true
+jni = "0.22.4"
+sdl3-sys = { version = "0.7.2", default-features = false }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

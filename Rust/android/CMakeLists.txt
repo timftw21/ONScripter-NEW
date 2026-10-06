@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.28)
+project(onscripter_rust_sdl LANGUAGES C CXX)
+set(SDL_SHARED ON CACHE BOOL "" FORCE)
+set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory("${SDL_SOURCE_DIR}" SDL)

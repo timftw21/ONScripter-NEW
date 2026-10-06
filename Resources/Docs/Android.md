@@ -1,5 +1,21 @@
 # Android
 
+The Rust rewrite has a separate project in `Rust/android` and package ID
+`org.onscripter.rewrite`. Its Gradle build compiles pinned SDL3 and the Rust
+engine, then produces `build/outputs/apk/debug/onscripter-rust-debug.apk`.
+Use SDK 36, NDK 28.2.13676358, Java 17+, CMake 3.28+, Ninja, and the workspace's
+Rust toolchain. Open that folder in Android Studio, or run `gradlew.bat
+assembleDebug` on Windows (`./gradlew assembleDebug` elsewhere). Set the SDK
+through `ANDROID_HOME` or its `local.properties`.
+
+Choose a game folder and, optionally, a modified-asset folder in the launcher.
+The rewrite uses persistent Android folder grants and seekable document handles;
+it needs no all-files permission. Non-seekable assets use a temporary streaming
+copy capped at 256 MiB. Fonts follow the same asset precedence as images. This is
+a development engine with partial command support; APK builds do not establish
+complete-game or device compatibility. The remaining sections describe the C++
+Android package.
+
 Reference for the Android target: how the native and Java halves fit together,
 the contracts between them, and the environment the build assumes.
 

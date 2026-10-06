@@ -9,6 +9,7 @@ Tools/nscdec/nscdec
 Tools/nscmake/nscmake
 CMakeLists.txt
 !/Tests/CMakeLists.txt
+!/Rust/android/CMakeLists.txt
 /Makefile
 /ciout
 .gradle/

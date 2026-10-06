@@ -10,6 +10,54 @@ permissions:
   contents: read
 
 jobs:
+  rust-rewrite:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load pinned Rust toolchain
+        run: rustup show
+      - name: Install SDL3 build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes cmake ninja-build pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxkbcommon-dev
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Check Rust code
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build Rust rewrite
+        run: cargo build --workspace --release --locked
+      - name: Run existing synthetic script
+        run: cargo run --release --locked -- run Tests/Fixtures/SmokeGame/0.txt
+      - name: Check Android ARM64 compilation
+        if: runner.os == 'Linux'
+        run: cargo check --workspace --target aarch64-linux-android --locked
+      - uses: actions/setup-java@v5
+        if: runner.os == 'Linux'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android build components
+        if: runner.os == 'Linux'
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"'
+      - name: Build Rust Android APK
+        if: runner.os == 'Linux'
+        working-directory: Rust/android
+        run: bash ./gradlew --no-daemon --console plain assembleDebug
+      - name: Check Android APK alignment
+        if: runner.os == 'Linux'
+        run: '"$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 Rust/android/build/outputs/apk/debug/onscripter-rust-debug.apk'
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: onscripter-rust-android-debug
+          path: Rust/android/build/outputs/apk/debug/onscripter-rust-debug.apk
+          if-no-files-found: error
+
   windows-ucrt64:
     runs-on: windows-latest
     timeout-minutes: 90
