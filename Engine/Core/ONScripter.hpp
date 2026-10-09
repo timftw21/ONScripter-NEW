@@ -67,7 +67,6 @@ const int DEFAULT_AUDIOBUF   = 2048;
 const int DEFAULT_FPS        = 30;
 
 static constexpr const char *RONDO_WM_TITLE   = "Umineko no Naku Koro ni: ~Rondo of the Witch and Reasoning~";
-static constexpr const char *CHIRU_WM_TITLE   = "Umineko no Naku Koro ni Chiru: ~Nocturne of Truth and Illusions~";
 static constexpr const char *DEFAULT_WM_TITLE = RONDO_WM_TITLE;
 
 const int ONS_MIX_CHANNELS = 50;

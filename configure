@@ -306,7 +306,6 @@ if $DROID_BUILD; then
   fi
 else
   if [[ $(uname) == Darwin* ]] && [ "$CROSS_TRIPLE" == "" ]; then
-    echo "Warning: macOS builds are best-effort and are not currently CI-validated."
     echo "Warning: Binaries are built without Cocoa extensions."
   fi
 fi

@@ -148,6 +148,8 @@ merged automatically.
 
 Desktop builds use local saves by default. Pass `--enable-icloud` to use
 iCloud storage on macOS or Windows; `--disable-icloud` selects local storage.
+If an existing installation saved to iCloud, use `--enable-icloud` to continue
+using those saves.
 
 This fork deliberately favors Umineko Project over compatibility with unrelated
 ONScripter games. For other titles, use ONScripter-RU or the engine recommended
