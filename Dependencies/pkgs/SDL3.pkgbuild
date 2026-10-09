@@ -1,10 +1,10 @@
 pkgname=SDL3
 pkgver=3.4.10
-pkgrel=2
+pkgrel=3
 sources=("https://www.libsdl.org/release/$pkgname-$pkgver.tar.gz"
     'SDL3-metal-upload-stride.patch')
 hashes=('12b34280415ec8418c864408b93d008a20a6530687ee613d60bfbd20411f2785'
-    'f6dc6b1ed5cd39e60981b39cf42c551f14cfe2f86e2ccbb7f689fab40c77edec')
+    '360d013c38daae2fe36054ed0ba52ad391c5f535c6bd7f9220edb205a8d65677')
 
 prebuild() {
     pushd "$pkgname-$pkgver" &>/dev/null
