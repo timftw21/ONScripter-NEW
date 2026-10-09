@@ -84,7 +84,7 @@ cat <<EndOfHelp
 
     -a  <arch>  sets the iOS or macOS architecture to build for.  May be specified
                 multiple times to pass multiple -arch flags to the compiler.
-                Defaults to x86_64 for macOS and arm64 for iOS.
+                Defaults to the host architecture for macOS and arm64 for iOS.
 EndOfHelp
     ;;
     esac
