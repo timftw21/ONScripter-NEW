@@ -191,12 +191,9 @@ void ScriptParser::reset() {
 	nsa_path = DirPaths();
 
 	freearr(&version_str);
-	version_str = new char[std::strlen(VERSION_STR1) +
-						   std::strlen("\n") +
-						   std::strlen(VERSION_STR2) +
-						   std::strlen("\n") +
-	                       +1];
-	std::sprintf(version_str, "%s\n%s\n", VERSION_STR1, VERSION_STR2);
+	const size_t versionLength = std::strlen(VERSION_STR1) + std::strlen(VERSION_STR2) + 3;
+	version_str = new char[versionLength];
+	std::snprintf(version_str, versionLength, "%s\n%s\n", VERSION_STR1, VERSION_STR2);
 
 	/* Text related variables */
 	sentence_font.reset();
@@ -497,8 +494,9 @@ void ScriptParser::setSavePath(const char *path) {
 		script_h.setStr(&script_h.save_path, path);
 	} else {
 		freearr(&script_h.save_path);
-		script_h.save_path = new char[std::strlen(path) + 2];
-		std::sprintf(script_h.save_path, "%s%c", path, DELIMITER);
+		const size_t savePathLength = std::strlen(path) + 2;
+		script_h.save_path = new char[savePathLength];
+		std::snprintf(script_h.save_path, savePathLength, "%s%c", path, DELIMITER);
 	}
 
 	if (!FileIO::accessFile(script_h.save_path, FileType::Directory) &&

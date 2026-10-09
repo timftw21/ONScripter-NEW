@@ -1011,10 +1011,11 @@ int32_t ScriptHandler::getStringFromInteger(char *buffer, int32_t no, int32_t nu
 
 	if (!use_zenkaku) {
 		const int32_t signed_value = static_cast<int32_t>(num_minus == 1 ? -magnitude : magnitude);
+		const size_t size = static_cast<size_t>(std::max(num_column, 1)) + 1;
 		if (is_zero_inserted)
-			std::sprintf(buffer, "%0*d", num_column, signed_value);
+			std::snprintf(buffer, size, "%0*d", num_column, signed_value);
 		else
-			std::sprintf(buffer, "%*d", num_column, signed_value);
+			std::snprintf(buffer, size, "%*d", num_column, signed_value);
 		return num_column;
 	}
 

@@ -51,8 +51,9 @@ int ScriptParser::versionstrCommand() {
 	const char *save_buf = script_h.saveStringBuffer();
 
 	const char *buf = script_h.readStr();
-	version_str     = new char[std::strlen(save_buf) + std::strlen(buf) + std::strlen("\n") * 2 + 1];
-	std::sprintf(version_str, "%s\n%s\n", save_buf, buf);
+	const size_t versionLength = std::strlen(save_buf) + std::strlen(buf) + 3;
+	version_str = new char[versionLength];
+	std::snprintf(version_str, versionLength, "%s\n%s\n", save_buf, buf);
 
 	return RET_CONTINUE;
 }
@@ -897,7 +898,7 @@ int ScriptParser::itoaCommand() {
 	if (itoa2_flag)
 		script_h.getStringFromInteger(val_str, val, -1, false, true);
 	else
-		std::sprintf(val_str, "%d", val);
+		std::snprintf(val_str, sizeof(val_str), "%d", val);
 	script_h.setStr(&script_h.getVariableData(no).str, val_str);
 
 	return RET_CONTINUE;

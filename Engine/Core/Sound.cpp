@@ -291,8 +291,9 @@ int ONScripter::playSound(const char *filename, int format, bool loop_flag, int 
 		// will recreate the header from a ".fmt" file if one exists
 		// assumes the first 128 bytes are bad (encrypted)
 		// _and_ that the file contains uncompressed PCM data
-		char *fmtname = new char[std::strlen(filename) + std::strlen(".fmt") + 1];
-		std::sprintf(fmtname, "%s.fmt", filename);
+		const size_t fmtnameLength = std::strlen(filename) + sizeof(".fmt");
+		char *fmtname = new char[fmtnameLength];
+		std::snprintf(fmtname, fmtnameLength, "%s.fmt", filename);
 
 		size_t fmtlen{0};
 		uint8_t *fmtbuffer{nullptr};
@@ -564,17 +565,17 @@ void ONScripter::playCDAudio() {
 	//for a file named "track01.mp3" or similar, depending on the
 	//track number; check for mp3, ogg and wav files
 	char filename[256];
-	std::sprintf(filename, R"(cd\track%2.2d.mp3)", current_cd_track);
+	std::snprintf(filename, sizeof(filename), R"(cd\track%2.2d.mp3)", current_cd_track);
 	int ret = playSoundThreaded(filename, SOUND_MUSIC, cd_play_loop_flag);
 	if (ret == SOUND_MUSIC)
 		return;
 
-	std::sprintf(filename, R"(cd\track%2.2d.ogg)", current_cd_track);
+	std::snprintf(filename, sizeof(filename), R"(cd\track%2.2d.ogg)", current_cd_track);
 	ret = playSoundThreaded(filename, SOUND_MUSIC, cd_play_loop_flag);
 	if (ret == SOUND_MUSIC)
 		return;
 
-	std::sprintf(filename, R"(cd\track%2.2d.wav)", current_cd_track);
+	std::snprintf(filename, sizeof(filename), R"(cd\track%2.2d.wav)", current_cd_track);
 	playSoundThreaded(filename, SOUND_MUSIC, cd_play_loop_flag, MIX_BGM_CHANNEL);
 }
 
