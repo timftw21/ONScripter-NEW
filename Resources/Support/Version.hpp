@@ -12,7 +12,7 @@
 #define macro_xstr(s) macro_str(s)
 #define macro_str(s) #s
 
-#define VER_NUMBER 20261006-new
+#define VER_NUMBER 20261009-new
 #define ONS_VERSION macro_xstr(VER_NUMBER)
 #define ONS_CODENAME macro_xstr(Chamerion)
 #define NSC_VERSION 300

@@ -16,7 +16,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        include:
+          - runner: macos-15
+            arch: aarch64
+            package-arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+            package-arch: x86_64
     steps:
       - uses: actions/checkout@v5
       - name: Install build tools
@@ -30,6 +36,15 @@ jobs:
           cmake -S Tests -B DerivedData/tests -G Ninja
           cmake --build DerivedData/tests --parallel 2
           ctest --test-dir DerivedData/tests --output-on-failure
+      - name: Package macOS app
+        run: >-
+          bash Scripts/macbuild.tool DerivedData/MacOSX-${{ matrix.arch }}
+          DerivedData/Release/onscripter-new-macos-${{ matrix.package-arch }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onscripter-new-macos-${{ matrix.package-arch }}
+          path: DerivedData/Release/onscripter-new-macos-${{ matrix.package-arch }}.zip
+          if-no-files-found: error
 
   windows-ucrt64:
     runs-on: windows-latest
