@@ -24,7 +24,7 @@ jobs:
       - name: Configure
         run: ./configure --release-build --std=gnu++23 --with-werror
       - name: Build
-        run: make -j2
+        run: make -k -j2
       - name: Native regression tests
         run: |
           cmake -S Tests -B DerivedData/tests -G Ninja
