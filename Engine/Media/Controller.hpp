@@ -19,6 +19,7 @@
 
 extern "C" {
 #include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
 #include <libavutil/channel_layout.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -86,7 +87,8 @@ public:
 
 		static AVPixelFormat defaultFormat(const AVPixelFormat *format) {
 			for (size_t i = 0; format[i] != AV_PIX_FMT_NONE; i++) {
-				if (hardwareAcceleratedFormats.find(format[i]) == hardwareAcceleratedFormats.end())
+				const auto *descriptor = av_pix_fmt_desc_get(format[i]);
+				if (descriptor && !(descriptor->flags & AV_PIX_FMT_FLAG_HWACCEL))
 					return format[i];
 			}
 			return AV_PIX_FMT_NONE;

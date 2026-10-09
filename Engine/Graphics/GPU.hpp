@@ -526,7 +526,7 @@ public:
 #endif
 
 	GPURendererInfo renderers[1]{
-	    {"Vulkan",
+	    {NativeGPURenderer,
 	     &GPUController::makeRendererIdSDL3GPU,
 	     &GPUController::initRendererFlagsSDL3GPU,
 	     &GPUController::getImageFormatSDL3GPU,

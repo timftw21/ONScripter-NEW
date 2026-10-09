@@ -1043,7 +1043,7 @@ void ONScripter::lookupSavePath() {
 		gameid = gamename;
 	}
 
-	bool trycloud       = ons_cfg_options.find("disable-icloud") == ons_cfg_options.end();
+	bool trycloud       = ons_cfg_options.find("enable-icloud") != ons_cfg_options.end();
 	const char *storage = FileIO::getStorageDir(trycloud);
 
 	script_h.save_path = new char[PATH_MAX];

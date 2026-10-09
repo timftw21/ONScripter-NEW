@@ -50,16 +50,6 @@ uint64_t nowMilliseconds() {
 	return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count());
 }
 
-void sleepMilliseconds(uint32_t ms) {
-#ifdef WIN32
-	Sleep(ms);
-#elif defined(LINUX) || defined(MACOSX)
-	usleep(static_cast<useconds_t>(ms) * 1000);
-#else
-	(void)ms;
-#endif
-}
-
 void writeLE32(uint8_t *dst, uint32_t value) {
 	dst[0] = static_cast<uint8_t>(value & 0xff);
 	dst[1] = static_cast<uint8_t>((value >> 8) & 0xff);
@@ -421,7 +411,7 @@ bool DiscordPresence::readExact(uint8_t *data, size_t size, uint32_t timeoutMs) 
 		if (available < size - readTotal) {
 			if (nowMilliseconds() >= deadline)
 				return false;
-			sleepMilliseconds(5);
+			Sleep(5);
 			continue;
 		}
 

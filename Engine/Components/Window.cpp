@@ -8,6 +8,7 @@
  */
 
 #include "Engine/Components/Window.hpp"
+#include "Support/WindowGeometry.hpp"
 #include "Engine/Graphics/GPU.hpp"
 #include "Engine/Graphics/Common.hpp"
 #include "Engine/Core/ONScripter.hpp"
@@ -207,6 +208,41 @@ void WindowController::getInitialRenderSize(int &w, int &h) {
 	h = screen_height;
 }
 
+void WindowController::updateFullscreenGeometry(int display_width, int display_height) {
+	if (display_width <= 0 || display_height <= 0 || script_width <= 0 || script_height <= 0)
+		return;
+	if (scaled_flag) {
+		float scr_stretch_x = display_width / static_cast<float>(script_width);
+		float scr_stretch_y = display_height / static_cast<float>(script_height);
+
+		// This was marked "Deprecated and should be removed" -- now it only exists in this one place. The suspicious +0.5 makes me hesitant to refactor to remove this variable.
+		int screen_ratio1, screen_ratio2;
+
+		// Constrain aspect to same as game
+		if (scr_stretch_x > scr_stretch_y) {
+			screen_ratio1 = display_height;
+			screen_ratio2 = script_height;
+		} else {
+			screen_ratio1 = display_width;
+			screen_ratio2 = script_width;
+		}
+
+		fullscreen_width  = std::round(static_cast<float>(script_width * screen_ratio1) / screen_ratio2);
+		fullscreen_height = std::round(static_cast<float>(script_height * screen_ratio1) / screen_ratio2);
+	}
+
+	fullscript_width    = script_width * display_width / static_cast<float>(fullscreen_width);
+	fullscript_height   = script_height * display_height / static_cast<float>(fullscreen_height);
+	fullscript_offset_x = (fullscript_width - script_width) / 2 - system_offset_x;
+	fullscript_offset_y = (fullscript_height - script_height) / 2 - system_offset_y;
+	// A hack for some resolutions to solve scaling issues like random stripes
+	// e. g. 1366x768
+	// bg white,1
+	// lsp s0_1,"white1080p.png",0,0
+	// print 1
+	fullscreen_reduced_clip = {fullscript_offset_x + 0.5f, fullscript_offset_y + 0.5f, script_width - 1.0f, script_height - 1.0f};
+}
+
 bool WindowController::updateDisplayData(bool getpos) {
 	if (getpos)
 		SDL_GetWindowPosition(window, &window_x, &window_y);
@@ -277,36 +313,8 @@ bool WindowController::updateDisplayData(bool getpos) {
 	// that caused the resize bugs in the first place.
 	return true;
 #else
-	if (scaled_flag) {
-		float scr_stretch_x = displayData.fullscreenDisplay->native_width / static_cast<float>(screen_width);
-		float scr_stretch_y = displayData.fullscreenDisplay->native_height / static_cast<float>(screen_height);
-
-		// This was marked "Deprecated and should be removed" -- now it only exists in this one place. The suspicious +0.5 makes me hesitant to refactor to remove this variable.
-		int screen_ratio1, screen_ratio2;
-
-		// Constrain aspect to same as game
-		if (scr_stretch_x > scr_stretch_y) {
-			screen_ratio1 = displayData.fullscreenDisplay->native_height;
-			screen_ratio2 = script_height;
-		} else {
-			screen_ratio1 = displayData.fullscreenDisplay->native_width;
-			screen_ratio2 = script_width;
-		}
-
-		fullscreen_width  = std::round(static_cast<float>(script_width * screen_ratio1) / screen_ratio2);
-		fullscreen_height = std::round(static_cast<float>(script_height * screen_ratio1) / screen_ratio2);
-	}
-
-	fullscript_width    = script_width * displayData.fullscreenDisplay->native_width / static_cast<float>(fullscreen_width);
-	fullscript_height   = script_height * displayData.fullscreenDisplay->native_height / static_cast<float>(fullscreen_height);
-	fullscript_offset_x = (fullscript_width - script_width) / 2 - system_offset_x;
-	fullscript_offset_y = (fullscript_height - script_height) / 2 - system_offset_y;
-	// A hack for some resolutions to solve scaling issues like random stripes
-	// e. g. 1366x768
-	// bg white,1
-	// lsp s0_1,"white1080p.png",0,0
-	// print 1
-	fullscreen_reduced_clip = {fullscript_offset_x + 0.5f, fullscript_offset_y + 0.5f, script_width - 1.0f, script_height - 1.0f};
+	updateFullscreenGeometry(displayData.fullscreenDisplay->native_width,
+	                         displayData.fullscreenDisplay->native_height);
 
 	return true;
 #endif
@@ -376,6 +384,13 @@ bool WindowController::changeMode(bool perform, bool correct, int mode) {
 	// 3) Enter fullscreen mode.
 	// Window positioning and mouse remaps are done in a manual manner here.
 
+	if (perform && mode == 0 && fullscreen_mode) {
+		int mouse_x, mouse_y;
+		onsGetMouseState(&mouse_x, &mouse_y);
+		windowed_mouse_position.x = fullscreenToWindowedCoordinate(mouse_x, screen_width, windowed_screen_width, script_width, fullscript_offset_x);
+		windowed_mouse_position.y = fullscreenToWindowedCoordinate(mouse_y, screen_height, windowed_screen_height, script_height, fullscript_offset_y);
+	}
+
 	if (!updateDisplayData() && mode > 0) {
 		// Request to enter fullscreen when we are in fullscreen-banned mode. Deny it
 		return false;
@@ -434,6 +449,17 @@ bool WindowController::changeMode(bool perform, bool correct, int mode) {
 	}
 
 	if (correct) {
+#if !defined(DROID)
+		if (fullscreen_mode) {
+			int actual_width, actual_height;
+			SDL_GetWindowSize(window, &actual_width, &actual_height);
+			updateFullscreenGeometry(actual_width, actual_height);
+			screen_width = fullscreen_width;
+			screen_height = fullscreen_height;
+			GPU_SetWindowResolution(actual_width, actual_height);
+			gpu.setVirtualResolution(fullscript_width, fullscript_height);
+		}
+#endif
 		// Set correct window dimensions (we are returning to windowed mode)
 		if (!fullscreen_mode) {
 			screen_width  = windowed_screen_width;
@@ -443,8 +469,8 @@ bool WindowController::changeMode(bool perform, bool correct, int mode) {
 			onsGetMouseState(&mouse_x, &mouse_y);
 			//We need to correct a shifted mouse
 			//sendToLog(LogLevel::Info, "Going to windowed. Before: %u, %u\n", mouse_x, mouse_y);
-			mouse_x = ((mouse_x - (screen_width / static_cast<float>(script_width)) * fullscript_offset_x) * windowed_screen_width / fullscreen_width);
-			mouse_y = ((mouse_y - (screen_height / static_cast<float>(script_height)) * fullscript_offset_y) * windowed_screen_height / fullscreen_height);
+			mouse_x = windowed_mouse_position.x;
+			mouse_y = windowed_mouse_position.y;
 			//sendToLog(LogLevel::Info, "Going to windowed. After: %u, %u\n", mouse_x, mouse_y);
 
 			GPU_SetWindowResolution(screen_width, screen_height);

@@ -558,7 +558,14 @@ void ONScripter::fetchEventsToQueue() {
 	// the title screen. Polling and sleeping by hand costs the same 8ms of
 	// latency and actually yields the CPU.
 	auto nextEvent = [](SDL_Event *e) -> bool {
-#if defined(DROID)
+#if defined(MACOSX) || defined(IOS)
+		// Cocoa events are pumped by the main loop. Waiting or polling here
+		// would also pump AppKit from this worker thread.
+		if (SDL_PeepEvents(e, 1, SDL_GETEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT) > 0)
+			return true;
+		SDL_Delay(EVENT_QUEUE_IDLE_WAIT_MS);
+		return false;
+#elif defined(DROID)
 		if (SDL_PollEvent(e))
 			return true;
 		SDL_Delay(EVENT_QUEUE_IDLE_WAIT_MS);

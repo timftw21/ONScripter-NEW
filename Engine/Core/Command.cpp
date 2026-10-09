@@ -1581,13 +1581,12 @@ int ONScripter::mp3Command() {
 		mp3save_flag = false;
 	}
 
-	music_play_loop_flag = loop_flag;
-
 	const char *buf = script_h.readFilePath();
 	if (!fast_switch || buf[0] == '\0')
 		mp3stopCommand();
 
 	if (buf[0] != '\0') {
+		music_play_loop_flag = loop_flag;
 		int tmp = music_volume;
 		script_h.setStr(&music_file_name, buf);
 
@@ -3395,13 +3394,7 @@ int ONScripter::cellCommand() {
 
 int ONScripter::captionCommand() {
 	const char *caption = script_h.readStr();
-	const char *title   = DEFAULT_WM_TITLE;
-	if (caption && std::strstr(caption, "Nocturne of Truth and Illusions"))
-		title = CHIRU_WM_TITLE;
-	else if (caption && std::strstr(caption, "Rondo of the Witch and Reasoning"))
-		title = RONDO_WM_TITLE;
-
-	script_h.setStr(&wm_title_string, title);
+	script_h.setStr(&wm_title_string, caption && caption[0] ? caption : DEFAULT_WM_TITLE);
 	window.setTitle(wm_title_string);
 	updateDiscordPresence();
 

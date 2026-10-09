@@ -13,8 +13,9 @@ history belongs in Git, issues, and release notes rather than this document.
 - The SDL3/SDL3_GPU renderer is the only supported renderer.
 
 The obsolete SDL2-based Xcode project has been removed so it can no longer
-produce misleading builds. The configure-based macOS path is best-effort until
-a current SDL3 build is exercised in CI.
+produce misleading builds. The configure-based macOS build uses SDL3 and Metal,
+with Apple Silicon and Intel builds checked in CI. GPU and gameplay validation
+still require macOS hardware.
 
 ## Windows prerequisites
 

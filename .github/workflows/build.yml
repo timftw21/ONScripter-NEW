@@ -10,6 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  macos:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install build tools
+        run: brew install autoconf automake libtool cmake meson ninja nasm pkg-config
+      - name: Configure
+        run: ./configure --release-build --std=gnu++23 --with-werror
+      - name: Build
+        run: make -k -j2
+      - name: Native regression tests
+        run: |
+          cmake -S Tests -B DerivedData/tests -G Ninja
+          cmake --build DerivedData/tests --parallel 2
+          ctest --test-dir DerivedData/tests --output-on-failure
+
   windows-ucrt64:
     runs-on: windows-latest
     timeout-minutes: 90

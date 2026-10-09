@@ -46,3 +46,6 @@ gradlew text eol=lf
 
 # Patch context must retain the original script's whitespace.
 Resources/GamePatches/*.patch text eol=lf -whitespace
+
+# Dependency recipes hash patches with LF line endings; preserve patch context.
+Dependencies/patches/*.patch text eol=lf -whitespace

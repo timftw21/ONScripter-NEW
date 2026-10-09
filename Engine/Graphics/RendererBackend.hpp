@@ -26,3 +26,11 @@ using RenderShaderBlock = GPU_ShaderBlock;
 using RenderShaderType = GPU_ShaderEnum;
 using RenderTarget = GPU_Target;
 using RenderWindowFlags = GPU_WindowFlagEnum;
+
+#if defined(MACOSX) || defined(IOS)
+inline constexpr const char *NativeGPUDriver = "metal";
+inline constexpr const char *NativeGPURenderer = "Metal";
+#else
+inline constexpr const char *NativeGPUDriver = "vulkan";
+inline constexpr const char *NativeGPURenderer = "Vulkan";
+#endif

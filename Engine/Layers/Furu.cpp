@@ -387,8 +387,8 @@ char *FuruLayer::message(const char *message, int &ret_int) {
 		//Get Parameters
 	} else if (!std::strcmp(message, "g")) {
 		ret_int = paused ? 1 : 0;
-		std::sprintf(&buf[0][0], "s|%d,%d,%d,%d,%d", interval, fall_velocity,
-		             wind, amplitude, (freq * 360 / FURU_AMP_TABLE_SIZE));
+		std::snprintf(buf[0], sizeof(buf[0]), "s|%d,%d,%d,%d,%d", interval, fall_velocity,
+		              wind, amplitude, (freq * 360 / FURU_AMP_TABLE_SIZE));
 		setStr(&ret_str, &buf[0][0]);
 		//Halt adding new elements
 	} else if (!std::strcmp(message, "h")) {

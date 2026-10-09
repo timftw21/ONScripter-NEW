@@ -1,0 +1,18 @@
+--- a/configure
++++ b/configure
+@@ -12859,3 +12859,3 @@
+-		DEBUG="-DDARWIN -fno-common -force_cpusubtype_ALL -Wall -g -O0 -fsigned-char"
+-		CFLAGS="-DDARWIN -fno-common -force_cpusubtype_ALL -Wall -g -O3 -ffast-math -fsigned-char"
+-		PROFILE="-DDARWIN -fno-common -force_cpusubtype_ALL -Wall -g -pg -O3 -ffast-math -fsigned-char";;
++		DEBUG="-DDARWIN -fno-common -Wall -g -O0 -fsigned-char"
++		CFLAGS="-DDARWIN -fno-common -Wall -g -O3 -ffast-math -fsigned-char"
++		PROFILE="-DDARWIN -fno-common -Wall -g -pg -O3 -ffast-math -fsigned-char";;
+--- a/configure.ac
++++ b/configure.ac
+@@ -205,3 +205,3 @@
+-		DEBUG="-DDARWIN -fno-common -force_cpusubtype_ALL -Wall -g -O0 -fsigned-char"
+-		CFLAGS="-DDARWIN -fno-common -force_cpusubtype_ALL -Wall -g -O3 -ffast-math -fsigned-char"
+-		PROFILE="-DDARWIN -fno-common -force_cpusubtype_ALL -Wall -g -pg -O3 -ffast-math -fsigned-char";;
++		DEBUG="-DDARWIN -fno-common -Wall -g -O0 -fsigned-char"
++		CFLAGS="-DDARWIN -fno-common -Wall -g -O3 -ffast-math -fsigned-char"
++		PROFILE="-DDARWIN -fno-common -Wall -g -pg -O3 -ffast-math -fsigned-char";;

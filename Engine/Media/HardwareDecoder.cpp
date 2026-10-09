@@ -12,9 +12,7 @@
 #if defined(IOS) || defined(MACOSX)
 
 extern "C" {
-#include <VideoToolbox/VideoToolbox.h>
-#include <libavcodec/videotoolbox.h>
-#include <libavutil/imgutils.h>
+#include <libavutil/hwcontext.h>
 }
 
 namespace HardwareDecoderVT {
@@ -22,9 +20,23 @@ namespace HardwareDecoderVT {
 static void reg() {}
 
 static AVPixelFormat init(AVCodecContext *context, const AVPixelFormat *format) {
-	if (MediaProcController::HardwareDecoderIFace::hasFormat(format, AV_PIX_FMT_VIDEOTOOLBOX) && av_videotoolbox_default_init(context) >= 0) {
-		sendToLog(LogLevel::Info, "Successfully initialised VT decoder\n");
-		return AV_PIX_FMT_VIDEOTOOLBOX;
+	if (MediaProcController::HardwareDecoderIFace::hasFormat(format, AV_PIX_FMT_VIDEOTOOLBOX)) {
+		AVBufferRef *device = nullptr;
+		AVBufferRef *frames = nullptr;
+		int ret = av_hwdevice_ctx_create(&device, AV_HWDEVICE_TYPE_VIDEOTOOLBOX, nullptr, nullptr, 0);
+		if (ret >= 0)
+			ret = avcodec_get_hw_frames_parameters(context, device, AV_PIX_FMT_VIDEOTOOLBOX, &frames);
+		av_buffer_unref(&device);
+		if (ret >= 0)
+			ret = av_hwframe_ctx_init(frames);
+		if (ret >= 0) {
+			av_buffer_unref(&context->hw_frames_ctx);
+			context->hw_frames_ctx = frames;
+			sendToLog(LogLevel::Info, "Successfully initialised VT decoder\n");
+			return AV_PIX_FMT_VIDEOTOOLBOX;
+		}
+		av_buffer_unref(&frames);
+		sendToLog(LogLevel::Warn, "Unable to initialise VT decoder; using software decoding\n");
 	}
 
 	return MediaProcController::HardwareDecoderIFace::defaultFormat(format);
@@ -35,85 +47,28 @@ static const AVCodec *findDecoder(AVCodecContext *) {
 }
 
 static void deinit(AVCodecContext *context) {
-	if (context->pix_fmt == AV_PIX_FMT_VIDEOTOOLBOX)
-		av_videotoolbox_default_free(context);
+	// FFmpeg releases the frame pool and device when the codec context is freed.
+	(void)context;
 }
 
 static AVFrame *process(AVFrame *dFrame, AVFrame *&tempFrame) {
 	if (dFrame->format != AV_PIX_FMT_VIDEOTOOLBOX)
 		return dFrame;
 
-	auto pixbuf         = reinterpret_cast<CVPixelBufferRef>(dFrame->data[3]);
-	OSType pixel_format = CVPixelBufferGetPixelFormatType(pixbuf);
-
-	if (tempFrame) {
+	if (tempFrame)
 		av_frame_unref(tempFrame);
-	} else {
+	else
 		tempFrame = av_frame_alloc();
-	}
-
-	switch (pixel_format) {
-		case kCVPixelFormatType_420YpCbCr8Planar:
-			tempFrame->format = AV_PIX_FMT_YUV420P;
-			break;
-		case kCVPixelFormatType_422YpCbCr8:
-			tempFrame->format = AV_PIX_FMT_UYVY422;
-			break;
-		case kCVPixelFormatType_422YpCbCr8_yuvs:
-			tempFrame->format = AV_PIX_FMT_YUYV422;
-			break;
-		case kCVPixelFormatType_32BGRA:
-			tempFrame->format = AV_PIX_FMT_BGRA;
-			break;
-		case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
-			tempFrame->format = AV_PIX_FMT_NV12;
-			break;
-		default:
-			sendToLog(LogLevel::Error, "Can't decode video frame with VT decoder\n");
-			return nullptr;
-	}
-
-	tempFrame->width  = dFrame->width;
-	tempFrame->height = dFrame->height;
-	int ret           = av_frame_get_buffer(tempFrame, 32);
-	if (ret < 0) {
+	if (!tempFrame)
 		return nullptr;
-	}
 
-	CVReturn err = CVPixelBufferLockBaseAddress(pixbuf, kCVPixelBufferLock_ReadOnly);
-	if (err != kCVReturnSuccess) {
-		sendToLog(LogLevel::Error, "Error locking the pixel buffer\n");
+	// Use FFmpeg's transfer path for every pixel format exposed by VideoToolbox.
+	if (av_hwframe_transfer_data(tempFrame, dFrame, 0) < 0 ||
+	    av_frame_copy_props(tempFrame, dFrame) < 0)
 		return nullptr;
-	}
-
-	size_t planes{0};
-	uint8_t *data[4]{};
-	int linesize[4]{};
-
-	if (CVPixelBufferIsPlanar(pixbuf)) {
-		planes = CVPixelBufferGetPlaneCount(pixbuf);
-		for (size_t i = 0; i < planes; i++) {
-			data[i]     = static_cast<uint8_t *>(CVPixelBufferGetBaseAddressOfPlane(pixbuf, i));
-			linesize[i] = static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pixbuf, i));
-		}
-	} else {
-		data[0]     = static_cast<uint8_t *>(CVPixelBufferGetBaseAddress(pixbuf));
-		linesize[0] = static_cast<int>(CVPixelBufferGetBytesPerRow(pixbuf));
-	}
-
-	av_image_copy(tempFrame->data, tempFrame->linesize,
-	              const_cast<const uint8_t **>(data), linesize, static_cast<AVPixelFormat>(tempFrame->format),
-	              dFrame->width, dFrame->height);
-
-	ret = av_frame_copy_props(tempFrame, dFrame);
-	CVPixelBufferUnlockBaseAddress(pixbuf, kCVPixelBufferLock_ReadOnly);
-	if (ret < 0) {
-		return nullptr;
-	}
 
 	av_frame_unref(dFrame);
 	av_frame_move_ref(dFrame, tempFrame);
-
 	return dFrame;
 }
 } // namespace HardwareDecoderVT

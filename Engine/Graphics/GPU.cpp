@@ -89,7 +89,7 @@ RenderTarget *GPUController::rendererInitWithInfo(GPURendererInfo &info, uint16_
 		          (it == ons.ons_cfg_options.end() ? "set automatically" : "provided by user"),
 		          max_chunk);
 
-		if (w != window.script_width || h != window.script_height)
+		if (screen->w != window.script_width || screen->h != window.script_height)
 			GPU_SetVirtualResolution(screen, window.script_width, window.script_height);
 		window.setMainTarget(screen);
 
@@ -130,7 +130,7 @@ RenderTarget *GPUController::rendererInit(RenderWindowFlags SDL_flags) {
 	if (it != ons.ons_cfg_options.end())
 		preferred = it->second;
 	if (preferred == "SDL3_GPU")
-		preferred = "Vulkan";
+		preferred = NativeGPURenderer;
 
 	size_t rendererPasses = 1 + !preferred.empty();
 
@@ -145,7 +145,7 @@ RenderTarget *GPUController::rendererInit(RenderWindowFlags SDL_flags) {
 	for (size_t i = 0; i < rendererPasses; i++) {
 		for (auto &renderer : renderers) {
 			if (blacklisted.find(renderer.name) != std::string::npos ||
-			    (std::string(renderer.name) == "Vulkan" && blacklisted.find("SDL3_GPU") != std::string::npos)) {
+			    blacklisted.find("SDL3_GPU") != std::string::npos) {
 				sendToLog(LogLevel::Info, "Skipping blacklisted %s renderer\n", renderer.name);
 				continue;
 			}
@@ -164,7 +164,7 @@ RenderTarget *GPUController::rendererInit(RenderWindowFlags SDL_flags) {
 				return screen;
 		}
 
-		if (rendererPasses > 1) {
+		if (!preferred.empty()) {
 			std::string msg = "Cannot use preferred renderer " + preferred + "! Will try other available renderers now.";
 			sendToLog(LogLevel::Warn, "%s\n", msg.c_str());
 			window.showSimpleMessageBox(SDL_MESSAGEBOX_WARNING, VERSION_STR1, msg.c_str());

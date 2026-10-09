@@ -12,6 +12,7 @@
 #include "Engine/Core/ONScripter.hpp"
 #include "Engine/Readers/Direct.hpp"
 #include "Support/FileIO.hpp"
+#include "Support/MemoryBudget.hpp"
 #include "Support/SDLCompat.hpp"
 #include "Support/Unicode.hpp"
 #include "Resources/Support/Version.hpp"
@@ -95,11 +96,11 @@ void *__wrap_SDL_LoadObject(const char *sofile) {
 	printf(" -r, --root path                  set the root path to the game\n");
 	printf(" -s, --save path                  set the path to use for saved games\n");
 #if defined(WIN32)
-	printf("     --disable-icloud             do not store saved games in iCloud for Windows\n");
+	printf("     --enable-icloud              store saved games in iCloud for Windows\n");
 	printf("     --current-user-appdata       use the current user's AppData folder instead of AllUsers' AppData\n");
 	printf("     --use-console                use Windows Console for application output\n");
 #elif defined(MACOSX)
-	printf("     --disable-icloud             do not store saved games in iCloud\n");
+	printf("     --enable-icloud              store saved games in iCloud\n");
 	printf("     --skip-on-cmd                Cmd key behaves like Ctrl\n");
 #endif
 	printf("     --use-logfile                use out.txt and err.txt for application output\n");
@@ -423,7 +424,11 @@ static void parseOptions(int argc, char **argv, bool &hasArchivePath) {
 				ons.ons_cfg_options["sdl3-gpu-telemetry"] = "noval";
 				onsSDLSetEnv("ONS_SDL3_GPU_TELEMETRY", "1", true);
 #endif
+			} else if (!std::strcmp(argv[0] + 1, "-enable-icloud")) {
+				ons.ons_cfg_options.erase("disable-icloud");
+				ons.ons_cfg_options["enable-icloud"] = "noval";
 			} else if (!std::strcmp(argv[0] + 1, "-disable-icloud")) {
+				ons.ons_cfg_options.erase("enable-icloud");
 				ons.ons_cfg_options["disable-icloud"] = "noval";
 			} else if (!std::strcmp(argv[0] + 1, "-force-vsync")) {
 				ons.ons_cfg_options["force-vsync"] = "noval";
@@ -812,10 +817,6 @@ int main(int argc, char **argv) {
 	previousPid = currentPid;
 #endif
 
-	std::atexit([]() {
-		ctrl.deinit();
-	});
-
 	requestHighMemoryUsage();
 
 	bool hasArchivePath = false;
@@ -883,6 +884,10 @@ int main(int argc, char **argv) {
 		// Try app launch dir
 		works = initWithPath(FileIO::getLaunchDir(), hasArchivePath);
 
+		// A macOS application bundle conventionally stores its data here.
+		if (!works && FileIO::getBundleResourceDir())
+			works = initWithPath(FileIO::getBundleResourceDir(), hasArchivePath);
+
 		// Try app working dir
 		if (!works)
 			works = initWithPath(FileIO::getWorkingDir(), hasArchivePath);
@@ -903,7 +908,7 @@ int main(int argc, char **argv) {
 	auto &opts = ons.ons_cfg_options;
 
 	if (!FileIO::setStorageDir(opts.find("current-user-appdata") != opts.end()) ||
-	    !FileIO::makeDir(FileIO::getStorageDir(opts.find("disable-icloud") == opts.end()), nullptr, true))
+	    !FileIO::makeDir(FileIO::getStorageDir(opts.find("enable-icloud") != opts.end()), nullptr, true))
 		performTerminate("Failed to access storage directory!");
 
 	if (FileIO::getLogMode() == FileIO::LogMode::File) {
@@ -937,6 +942,14 @@ int main(int argc, char **argv) {
 	//  DynamicPropertyController
 	// }
 	// Deinitialisation is done automatically by ctrl.quit(exit_code);
+
+	// Resource cleanup can reserve pool memory. Construct the budget before
+	// registering cleanup so its function-static destructor runs afterwards.
+	// Configuration has been read by this point, including budget overrides.
+	(void)memoryBudget();
+	std::atexit([]() {
+		ctrl.deinit();
+	});
 
 	if (ons.init())
 		ctrl.quit(-1);

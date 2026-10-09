@@ -306,8 +306,7 @@ if $DROID_BUILD; then
   fi
 else
   if [[ $(uname) == Darwin* ]] && [ "$CROSS_TRIPLE" == "" ]; then
-    echo "Warning: macOS builds are best-effort and are not currently CI-validated."
-    echo "Warning: Binaries are built without Cocoa extensions and arch support!"
+    echo "Warning: Binaries are built without Cocoa extensions."
   fi
 fi
 
@@ -329,6 +328,9 @@ elif $DROID_BUILD; then
 else
   chmod +x Scripts/config.guess Scripts/config.sub
   PLATFORM=$(./Scripts/config.guess)
+  if [[ "$(uname)" == Darwin* && "$(uname -m)" == "arm64" ]]; then
+    PLATFORM="arm64-apple-darwin$(uname -r)"
+  fi
 fi
 
 SYS=Posix
@@ -355,7 +357,7 @@ case "$PLATFORM" in
 *86_64*)   echo "x86_64";   ARCH=x86_64;;
 *86*)      ARCH=`expr "x$PLATFORM" : 'x\(.*86\).*'`; \
            echo "$ARCH";;
-*aarch64*) echo "arm64";    ARCH=aarch64;;
+*aarch64* | *arm64*) echo "arm64";    ARCH=aarch64;;
 *arm*)     echo "arm";      ARCH=arm;;
 *)         echo "unknown";;
 esac
@@ -719,6 +721,9 @@ elif [ "$SYS" == "Droid" ]; then
   ONS_PKG_OPTS="-g $DROID_TOOLCHAIN"
   echo "onscrlib droid"
 else
+  if [ "$SYS" == "MacOSX" ]; then
+    ONS_PKG_OPTS="-a ${ARCH/aarch64/arm64} -m $MACOSX_DEPLOYMENT_TARGET"
+  fi
   echo "onscrlib native"
 fi
 
@@ -965,6 +970,7 @@ HEADERS=(
   'Support/Droid/DroidProfile.hpp'
   'Support/FileDefs.hpp'
   'Support/FileIO.hpp'
+  'Support/WindowGeometry.hpp'
   'Support/KeyState.hpp'
   'Support/SDLCompat.hpp'
   'Support/SDLImageCompat.hpp'

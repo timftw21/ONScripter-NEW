@@ -15,6 +15,7 @@
 #include "Engine/Graphics/GPU.hpp"
 #include "Engine/Graphics/SDL3GPUShaders/SDL3GPUShaders.hpp"
 #include "Support/FileDefs.hpp"
+#include "Resources/Support/Resources.hpp"
 
 #include <algorithm>
 #include <array>
@@ -914,6 +915,18 @@ SDL3GPUNativeUniform nativeUniform(const char *name,
 	return uniform;
 }
 
+template <size_t SpirvSize, size_t MetalSize>
+SDL_GPUShader *createBuiltInFragmentShader(const Uint8 (&spirv)[SpirvSize],
+                                           const Uint8 (&metal)[MetalSize],
+                                           const SDL3GPUNativeResourceInfo &resources) {
+	const SDL_GPUShaderFormat supported = SDL_GetGPUShaderFormats(rendererState.device);
+	if (supported & SDL_GPU_SHADERFORMAT_SPIRV)
+		return createPrecompiledFragmentShader(spirv, SpirvSize, SDL_GPU_SHADERFORMAT_SPIRV, resources);
+	if (supported & SDL_GPU_SHADERFORMAT_MSL)
+		return createPrecompiledFragmentShader(metal, MetalSize - 1, SDL_GPU_SHADERFORMAT_MSL, resources, "main0");
+	return nullptr;
+}
+
 bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
                                      SDL3GPUShaderKind kind,
                                      SDL3GPUShaderObject &object) {
@@ -921,14 +934,13 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return false;
 
 	const SDL_GPUShaderFormat supported = SDL_GetGPUShaderFormats(rendererState.device);
-	if (kind == SDL3GPUShaderKind::AlphaOutsideTextures && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (!(supported & (SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL)))
+		return false;
+	if (kind == SDL3GPUShaderKind::AlphaOutsideTextures) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(alpha_outside_textures_frag_spv,
-		                                                      sizeof(alpha_outside_textures_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(alpha_outside_textures_frag_spv, alpha_outside_textures_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -936,15 +948,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::BlendByMask && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::BlendByMask) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 3;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(blend_by_mask_frag_spv,
-		                                                      sizeof(blend_by_mask_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(blend_by_mask_frag_spv, blend_by_mask_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -955,17 +964,14 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if ((kind == SDL3GPUShaderKind::BlurH || kind == SDL3GPUShaderKind::BlurV) &&
-	    (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::BlurH || kind == SDL3GPUShaderKind::BlurV) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
 		const bool horizontal = kind == SDL3GPUShaderKind::BlurH;
-		object.nativeShader = createPrecompiledFragmentShader(horizontal ? blur_h_frag_spv : blur_v_frag_spv,
-		                                                      horizontal ? sizeof(blur_h_frag_spv) : sizeof(blur_v_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = horizontal ? createBuiltInFragmentShader(blur_h_frag_spv, blur_h_frag_msl, resources) :
+		                                   createBuiltInFragmentShader(blur_v_frag_spv, blur_v_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -975,15 +981,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::Breakup && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::Breakup) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 3;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(breakup_frag_spv,
-		                                                      sizeof(breakup_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(breakup_frag_spv, breakup_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -994,15 +997,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::ColorModification && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::ColorModification) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(color_modification_frag_spv,
-		                                                      sizeof(color_modification_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(color_modification_frag_spv, color_modification_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1018,15 +1018,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::ColourConversion && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::ColourConversion) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 3;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(colour_conversion_frag_spv,
-		                                                      sizeof(colour_conversion_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(colour_conversion_frag_spv, colour_conversion_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1036,14 +1033,11 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::CropByMask && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::CropByMask) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 2;
 
-		object.nativeShader = createPrecompiledFragmentShader(crop_by_mask_frag_spv,
-		                                                      sizeof(crop_by_mask_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(crop_by_mask_frag_spv, crop_by_mask_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1051,15 +1045,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::EffectTrvswave && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::EffectTrvswave) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(effect_trvswave_frag_spv,
-		                                                      sizeof(effect_trvswave_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(effect_trvswave_frag_spv, effect_trvswave_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1071,15 +1062,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::EffectWarp && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::EffectWarp) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(effect_warp_frag_spv,
-		                                                      sizeof(effect_warp_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(effect_warp_frag_spv, effect_warp_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1093,15 +1081,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::EffectWhirl && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::EffectWhirl) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(effect_whirl_frag_spv,
-		                                                      sizeof(effect_whirl_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(effect_whirl_frag_spv, effect_whirl_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1116,15 +1101,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::GlassSmash && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::GlassSmash) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(glass_smash_frag_spv,
-		                                                      sizeof(glass_smash_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(glass_smash_frag_spv, glass_smash_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1133,15 +1115,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::GlyphGradient && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::GlyphGradient) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(glyph_gradient_frag_spv,
-		                                                      sizeof(glyph_gradient_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(glyph_gradient_frag_spv, glyph_gradient_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1153,14 +1132,11 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::MergeAlpha && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::MergeAlpha) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 2;
 
-		object.nativeShader = createPrecompiledFragmentShader(merge_alpha_frag_spv,
-		                                                      sizeof(merge_alpha_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(merge_alpha_frag_spv, merge_alpha_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1168,14 +1144,11 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::MultiplyAlpha && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::MultiplyAlpha) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(multiply_alpha_frag_spv,
-		                                                      sizeof(multiply_alpha_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(multiply_alpha_frag_spv, multiply_alpha_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1183,15 +1156,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::Pixelate && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::Pixelate) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(pixelate_frag_spv,
-		                                                      sizeof(pixelate_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(pixelate_frag_spv, pixelate_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1202,15 +1172,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::RenderSubtitles && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::RenderSubtitles) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(render_subtitles_frag_spv,
-		                                                      sizeof(render_subtitles_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(render_subtitles_frag_spv, render_subtitles_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1224,15 +1191,12 @@ bool compilePrecompiledBuiltInShader(GPU_ShaderEnum shaderType,
 		return true;
 	}
 
-	if (kind == SDL3GPUShaderKind::TextFade && (supported & SDL_GPU_SHADERFORMAT_SPIRV)) {
+	if (kind == SDL3GPUShaderKind::TextFade) {
 		SDL3GPUNativeResourceInfo resources{};
 		resources.numSamplers = 1;
 		resources.numUniformBuffers = 1;
 
-		object.nativeShader = createPrecompiledFragmentShader(text_fade_frag_spv,
-		                                                      sizeof(text_fade_frag_spv),
-		                                                      SDL_GPU_SHADERFORMAT_SPIRV,
-		                                                      resources);
+		object.nativeShader = createBuiltInFragmentShader(text_fade_frag_spv, text_fade_frag_msl, resources);
 		if (!object.nativeShader)
 			return false;
 
@@ -1385,9 +1349,11 @@ SDL3GPUShaderKind identifyShaderSource(GPU_ShaderEnum shaderType, const std::str
 		return SDL3GPUShaderKind::ColourConversion;
 	if (containsText(source, "modificationType") && containsText(source, "replaceSrcColor"))
 		return SDL3GPUShaderKind::ColorModification;
-	if (containsText(source, "HORIZONTAL_BLUR_9"))
+	// Both blur sources mention both axes in their conditional branches.
+	// Identify the active definition, rather than an inactive branch.
+	if (containsText(source, "#define HORIZONTAL_BLUR_9"))
 		return SDL3GPUShaderKind::BlurH;
-	if (containsText(source, "VERTICAL_BLUR_9"))
+	if (containsText(source, "#define VERTICAL_BLUR_9"))
 		return SDL3GPUShaderKind::BlurV;
 	if (containsText(source, "breakupCellforms"))
 		return SDL3GPUShaderKind::Breakup;
@@ -5219,7 +5185,7 @@ SDL_GPUDevice *createGPUDevice(bool debugDevice) {
 	                                          SDL_GPU_SHADERFORMAT_DXIL |
 	                                          SDL_GPU_SHADERFORMAT_MSL |
 	                                          SDL_GPU_SHADERFORMAT_METALLIB;
-	return SDL_CreateGPUDevice(shaderFormats, debugDevice, "vulkan");
+	return SDL_CreateGPUDevice(shaderFormats, debugDevice, NativeGPUDriver);
 #endif
 }
 } // namespace
@@ -6920,6 +6886,190 @@ int SDLCALL GPU_RunMusicBoxBenchmark(int iterations, int width, int height, cons
 	return 0;
 }
 
+// Read through a render target so this checks the GPU upload, rather than the
+// source image's CPU pixel cache. Odd widths exercise padded transfer rows;
+// the large case also crosses the upload staging buffer's chunk boundary.
+static bool validateTextureUploads() {
+	for (const SDL_Point size : {SDL_Point{257, 65}, SDL_Point{1920, 1080}}) {
+		SDL_Surface *surface = createBenchmarkSurface(size.x, size.y);
+		GPU_Image *source = surface ? GPU_CopyImageFromSurface(surface) : nullptr;
+		GPU_Image *target = GPU_CreateImage(size.x, size.y, GPU_FORMAT_RGBA);
+		GPU_Target *destination = target ? GPU_GetTarget(target) : nullptr;
+		bool valid = source && destination;
+		SDL_Surface *readback = nullptr;
+		if (valid) {
+			GPU_SetBlending(source, false);
+			GPU_SetImageFilter(source, GPU_FILTER_NEAREST);
+			GPU_Blit(source, nullptr, destination, size.x / 2.0f, size.y / 2.0f);
+			readback = GPU_CopySurfaceFromImage(target);
+			valid = readback && readback->format == SDL_PIXELFORMAT_RGBA32;
+		}
+		if (valid) {
+			for (int y = 0; y < size.y && valid; ++y) {
+				const auto *expected = static_cast<const Uint8 *>(surface->pixels) + y * surface->pitch;
+				const auto *actual = static_cast<const Uint8 *>(readback->pixels) + y * readback->pitch;
+				for (int x = 0; x < size.x; ++x) {
+					if (std::memcmp(expected + x * 4, actual + x * 4, 4) != 0) {
+						std::fprintf(stderr, "Texture upload validation failed (%dx%d at %d,%d): expected %u,%u,%u,%u; got %u,%u,%u,%u\n",
+						             size.x, size.y, x, y, expected[x * 4], expected[x * 4 + 1], expected[x * 4 + 2], expected[x * 4 + 3],
+						             actual[x * 4], actual[x * 4 + 1], actual[x * 4 + 2], actual[x * 4 + 3]);
+						valid = false;
+						break;
+					}
+				}
+			}
+		}
+		if (readback)
+			SDL_FreeSurface(readback);
+		if (surface)
+			SDL_FreeSurface(surface);
+		if (source)
+			GPU_FreeImage(source);
+		if (target)
+			GPU_FreeImage(target);
+		if (!valid)
+			return false;
+	}
+	return true;
+}
+
+// Exercise every built-in effect through the normal linker, uniform setters,
+// sampler binding and draw path, comparing pixels with the CPU implementation.
+static bool validateBuiltInShaders(FILE *output) {
+	const SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(rendererState.device);
+	if (!(formats & (SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_SPIRV)))
+		return true;
+
+	constexpr int width = 65, height = 33;
+	std::array<GPU_Image *, 3> images{};
+	bool valid = true;
+	for (size_t slot = 0; slot < images.size(); ++slot) {
+		SDL_Surface *surface = createBenchmarkSurface(width, height);
+		if (!surface) {
+			valid = false;
+			break;
+		}
+		for (int y = 0; y < height; ++y) {
+			auto *row = static_cast<Uint8 *>(surface->pixels) + y * surface->pitch;
+			for (int x = 0; x < width; ++x) {
+				row[x * 4] = slot == 0 ? 40 + x * 2 : slot == 1 ? 210 - x : 192;
+				row[x * 4 + 1] = slot == 0 ? 30 + y * 3 : slot == 1 ? 160 - y * 2 : 32;
+				row[x * 4 + 2] = slot == 0 ? 20 + x + y : slot == 1 ? 180 - x - y : 64;
+				row[x * 4 + 3] = slot == 0 ? 64 + x + y : slot == 1 ? 160 : 200;
+			}
+		}
+		images[slot] = GPU_CopyImageFromSurface(surface);
+		SDL_FreeSurface(surface);
+		if (!images[slot]) {
+			valid = false;
+			break;
+		}
+		GPU_SetBlending(images[slot], false);
+		GPU_SetImageFilter(images[slot], GPU_FILTER_NEAREST);
+	}
+
+	auto compileResource = [](const char *name, GPU_ShaderEnum stage) {
+		const InternalResource *resource = getResource(name);
+		if (!resource)
+			return Uint32{0};
+		return GPU_CompileShader_RW(stage, SDL_RWFromConstMem(resource->buffer, resource->size), true);
+	};
+	const Uint32 vertexId = compileResource("defaultVertex.vert", GPU_VERTEX_SHADER);
+	valid = valid && vertexId != 0;
+	for (int index = static_cast<int>(SDL3GPUShaderKind::AlphaOutsideTextures);
+	     valid && index < static_cast<int>(SDL3GPUShaderKind::Count); ++index) {
+		const auto kind = static_cast<SDL3GPUShaderKind>(index);
+		const Uint32 fragmentId = compileResource(shaderKindName(kind), GPU_FRAGMENT_SHADER);
+		if (!fragmentId || shaderObjects.at(fragmentId).kind != kind || !shaderObjects.at(fragmentId).nativeShader) {
+			std::fprintf(stderr, "Native shader compile failed (%s): %s\n", shaderKindName(kind), GPU_GetShaderMessage());
+			valid = false;
+			break;
+		}
+		const Uint32 programId = GPU_LinkShaders(vertexId, fragmentId);
+		if (!programId) {
+			valid = false;
+			break;
+		}
+		GPU_ActivateShaderProgram(programId, nullptr);
+		for (int slot = 1; slot < 3; ++slot)
+			GPU_SetShaderImage(images[slot], -1, slot);
+		auto integer = [&](const char *name, int value) { GPU_SetUniformi(GPU_GetUniformLocation(programId, name), value); };
+		auto scalar = [&](const char *name, float value) { GPU_SetUniformf(GPU_GetUniformLocation(programId, name), value); };
+		auto vector = [&](const char *name, int components, float *value) {
+			GPU_SetUniformfv(GPU_GetUniformLocation(programId, name), components, 1, value);
+		};
+		integer("mask_value", 180); integer("constant_mask", 0); integer("crossfade", 1);
+		scalar("sigma", 2.5f); scalar("blurSize", 1.0f / (kind == SDL3GPUShaderKind::BlurV ? height : width));
+		scalar("tilesX", 1); scalar("tilesY", 1); integer("breakupCellforms", 4);
+		integer("modificationType", 4); integer("multiplyAlpha", 1); integer("dimension", width);
+		integer("conversionType", 1); integer("maskHeight", 0);
+		integer("script_width", width); integer("script_height", height);
+		integer("effect_counter", 0); integer("duration", 100); integer("direction", 1);
+		scalar("animationClock", 0.25f); scalar("amplitude", 0); scalar("wavelength", 100); scalar("speed", 1);
+		scalar("cx", 1); scalar("cy", 1); scalar("render_width", width); scalar("render_height", height);
+		scalar("texture_width", width); scalar("texture_height", height); scalar("alpha", 0.6f);
+		float color[]{0.8f, 0.4f, 0.6f, 0.7f};
+		vector("color", 4, color); integer("maxy", height); integer("faceAscender", height);
+		integer("width", width); integer("height", height); integer("factor", 1);
+		integer("partial", 17); integer("full", 23);
+		integer("ntextures", 2);
+		float dimensions[]{20, 10}, position0[]{4, 7}, position1[]{12, 10}, destination[]{width, height};
+		vector("subDims[0]", 2, dimensions); vector("subDims[1]", 2, dimensions);
+		vector("subCoords[0]", 2, position0); vector("subCoords[1]", 2, position1);
+		vector("subColors[0]", 4, color); vector("subColors[1]", 4, color);
+		vector("dstDims", 2, destination);
+
+		GPU_Image *nativeTarget = GPU_CreateImage(width, height, GPU_FORMAT_RGBA);
+		GPU_Image *cpuTarget = GPU_CreateImage(width, height, GPU_FORMAT_RGBA);
+		GPU_Target *nativeSurface = nativeTarget ? GPU_GetTarget(nativeTarget) : nullptr;
+		GPU_Target *cpuSurface = cpuTarget ? GPU_GetTarget(cpuTarget) : nullptr;
+		SDL_Surface *nativePixels = nullptr, *cpuPixels = nullptr;
+		if (nativeSurface && cpuSurface) {
+			GPU_ClearRGBA(nativeSurface, 0, 0, 0, 0);
+			GPU_ClearRGBA(cpuSurface, 0, 0, 0, 0);
+			auto &program = programObjects.at(programId);
+			const SDL3GPUVertex vertices[]{
+			    {0, 0, 1, 1, 1, 1, 0, 0}, {width, 0, 1, 1, 1, 1, 1, 0},
+			    {0, height, 1, 1, 1, 1, 0, 1}, {width, height, 1, 1, 1, 1, 1, 1}};
+			const Uint16 indices[]{0, 1, 2, 2, 1, 3};
+			// Call the native draw directly: an automatic CPU fallback must
+			// fail this test even if it would produce matching pixels.
+			if (renderNativeProgramIndexedTriangles(program, images[0], nativeSurface, vertices, 4, indices, 6))
+				nativePixels = GPU_CopySurfaceFromImage(nativeTarget);
+			SDL_GPUShader *savedShader = program.nativeFragmentShader;
+			program.nativeFragmentShader = nullptr;
+			GPU_Blit(images[0], nullptr, cpuSurface, width / 2.0f, height / 2.0f);
+			cpuPixels = GPU_CopySurfaceFromImage(cpuTarget);
+			program.nativeFragmentShader = savedShader;
+		}
+		valid = nativePixels && cpuPixels;
+		for (int y = 0; y < height && valid; ++y) {
+			const auto *nativeRow = static_cast<const Uint8 *>(nativePixels->pixels) + y * nativePixels->pitch;
+			const auto *cpuRow = static_cast<const Uint8 *>(cpuPixels->pixels) + y * cpuPixels->pitch;
+			for (int x = 0; x < width * 4; ++x) {
+				// Allow a texel boundary and UNORM rounding difference between
+				// GPU and CPU floating-point arithmetic on the smooth gradients.
+				if (std::abs(static_cast<int>(nativeRow[x]) - cpuRow[x]) > 4) {
+					std::fprintf(stderr, "Shader pixel mismatch (%s at %d,%d channel %d): native=%u CPU=%u\n",
+					             shaderKindName(kind), x / 4, y, x % 4, nativeRow[x], cpuRow[x]);
+					valid = false;
+					break;
+				}
+			}
+		}
+		GPU_DeactivateShaderProgram();
+		if (nativePixels) SDL_FreeSurface(nativePixels);
+		if (cpuPixels) SDL_FreeSurface(cpuPixels);
+		if (nativeTarget) GPU_FreeImage(nativeTarget);
+		if (cpuTarget) GPU_FreeImage(cpuTarget);
+	}
+	for (auto *image : images)
+		if (image) GPU_FreeImage(image);
+	if (valid)
+		printBenchmarkLine(output, "Native effect shader pixel validation passed (18 shaders).\n");
+	return valid;
+}
+
 int SDLCALL GPU_RunSDL3Benchmark(int iterations, int width, int height, const char *outputPath) {
 	iterations = std::max(1, iterations);
 	width      = std::max(320, width);
@@ -6943,6 +7093,13 @@ int SDLCALL GPU_RunSDL3Benchmark(int iterations, int width, int height, const ch
 	                                          SDL_WINDOW_HIDDEN);
 	if (!screen) {
 		std::fprintf(stderr, "SDL3_GPU init failed: %s\n", SDL_GetError());
+		SDL_Quit();
+		return 1;
+	}
+
+	if (!validateTextureUploads() || !validateBuiltInShaders(benchmarkOutput.file)) {
+		std::fprintf(stderr, "Texture upload/render/readback validation failed: %s\n", SDL_GetError());
+		GPU_Quit();
 		SDL_Quit();
 		return 1;
 	}

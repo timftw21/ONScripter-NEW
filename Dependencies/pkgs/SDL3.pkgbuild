@@ -1,8 +1,16 @@
 pkgname=SDL3
 pkgver=3.4.10
-pkgrel=1
-sources=("https://www.libsdl.org/release/$pkgname-$pkgver.tar.gz")
-hashes=('12b34280415ec8418c864408b93d008a20a6530687ee613d60bfbd20411f2785')
+pkgrel=3
+sources=("https://www.libsdl.org/release/$pkgname-$pkgver.tar.gz"
+    'SDL3-metal-upload-stride.patch')
+hashes=('12b34280415ec8418c864408b93d008a20a6530687ee613d60bfbd20411f2785'
+    '360d013c38daae2fe36054ed0ba52ad391c5f535c6bd7f9220edb205a8d65677')
+
+prebuild() {
+    pushd "$pkgname-$pkgver" &>/dev/null
+    # Metal must honor padded transfer rows, as the other GPU backends do.
+    apply_patch "${sources[1]}"
+}
 
 cflags="-O3"
 

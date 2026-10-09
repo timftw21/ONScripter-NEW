@@ -546,6 +546,32 @@ const char *FileIO::getHomeDir() {
 	return homeDir;
 }
 
+const char *FileIO::getBundleResourceDir() {
+	static const char *bundleResourceDir = nullptr;
+#if defined(MACOSX)
+	static char resourceDir[PATH_MAX];
+	static bool obtained = false;
+	if (!obtained) {
+		const char *launch = getLaunchDir();
+		constexpr const char bundleSuffix[] = "Contents/MacOS/";
+		size_t launchLength = std::strlen(launch);
+		size_t suffixLength = std::strlen(bundleSuffix);
+
+		if (launchLength >= suffixLength &&
+		    !std::strcmp(launch + launchLength - suffixLength, bundleSuffix)) {
+			// Replace the trailing MacOS/ component with Resources/.
+			size_t contentsLength = launchLength - std::strlen("MacOS/");
+			std::snprintf(resourceDir, PATH_MAX, "%.*sResources%c",
+			              static_cast<int>(contentsLength), launch, DELIMITER);
+			bundleResourceDir = resourceDir;
+		}
+
+		obtained = true;
+	}
+#endif
+	return bundleResourceDir;
+}
+
 const char *FileIO::getPlatformSpecificDir() {
 	static const char *platformSpecificDir = nullptr;
 #if defined(MACOSX)

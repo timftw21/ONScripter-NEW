@@ -1,0 +1,21 @@
+--- a/src/gpu/metal/SDL_gpu_metal.m
++++ b/src/gpu/metal/SDL_gpu_metal.m
+@@ -1809,13 +1809,16 @@
+         MetalTextureContainer *textureContainer = (MetalTextureContainer *)destination->texture;
+ 
+         MetalTexture *metalTexture = METAL_INTERNAL_PrepareTextureForWrite(renderer, textureContainer, cycle);
++        Uint32 bufferStride = source->pixels_per_row ? source->pixels_per_row : destination->w;
++        Uint32 bufferImageHeight = source->rows_per_layer ? source->rows_per_layer : destination->h;
++        Uint32 bytesPerRow = BytesPerRow(bufferStride, textureContainer->header.info.format);
+ 
+         [metalCommandBuffer->blitEncoder
+                  copyFromBuffer:bufferContainer->activeBuffer->handle
+                    sourceOffset:source->offset
+-              sourceBytesPerRow:BytesPerRow(destination->w, textureContainer->header.info.format)
++              sourceBytesPerRow:bytesPerRow
+             // sourceBytesPerImage expects the stride between 2D images (slices) of a 3D texture, not the size of the entire region
+-            sourceBytesPerImage:SDL_CalculateGPUTextureFormatSize(textureContainer->header.info.format, destination->w, destination->h, 1)
++            sourceBytesPerImage:SDL_CalculateGPUTextureFormatSize(textureContainer->header.info.format, bufferStride, bufferImageHeight, 1)
+                      sourceSize:MTLSizeMake(destination->w, destination->h, destination->d)
+                       toTexture:metalTexture->handle
+                destinationSlice:destination->layer

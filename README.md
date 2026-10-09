@@ -38,6 +38,12 @@ UCRT64 environment. A normal host build is:
 make -j8
 ```
 
+On Apple Silicon, `configure` selects arm64 and places the build in
+`DerivedData/MacOSX-aarch64`. macOS builds require macOS 14 or newer.
+The macOS renderer uses Metal. All 18 built-in effects have
+native Metal shaders, including blur, transitions, text, and video conversion.
+The shader sources are embedded; no shader translator is needed at runtime.
+
 Android has its own build, run and debug guide, including the Android Studio
 workflow: [Resources/Docs/Android.md](Resources/Docs/Android.md).
 
@@ -60,7 +66,7 @@ policy.
 
 - Smoother animation and rain effects, especially on high-refresh displays.
 - Faster menus, text rendering, save/load operations, and scene composition.
-- Modern Vulkan-based graphics through SDL3, with hardware-assisted video
+- Modern graphics through SDL3 (Vulkan on Windows/Android, Metal on macOS), with hardware-assisted video
   playback and color conversion where supported.
 - More predictable RAM use during long sessions and video playback.
 - Current Windows and Android builds with fewer legacy runtime dependencies.
@@ -139,6 +145,11 @@ progress is in a separate `UminekoPS3ficationWh` or `UminekoPS3ficationRu`
 folder, back up all profiles and copy your preferred profile's contents into
 `UminekoPS3ficationEn` before switching languages. Separate profiles are not
 merged automatically.
+
+Desktop builds use local saves by default. Pass `--enable-icloud` to use
+iCloud storage on macOS or Windows; `--disable-icloud` selects local storage.
+If an existing installation saved to iCloud, use `--enable-icloud` to continue
+using those saves.
 
 This fork deliberately favors Umineko Project over compatibility with unrelated
 ONScripter games. For other titles, use ONScripter-RU or the engine recommended

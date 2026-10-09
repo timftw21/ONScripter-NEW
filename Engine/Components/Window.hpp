@@ -77,6 +77,8 @@ class WindowController : public BaseController {
 	bool fullscreen_mode{DefaultFullscreen};
 	// Currently in fullscreen transition state.
 	bool fullscreen_needs_fix{false};
+	SDL_Point windowed_mouse_position{};
+	void updateFullscreenGeometry(int display_width, int display_height);
 
 public:
 	// Resolution the script runs at.
