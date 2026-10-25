@@ -31,6 +31,7 @@ void *__wrap_SDL_LoadObject(const char *sofile);
 }
 #endif
 
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -955,9 +956,14 @@ int main(int argc, char **argv) {
 
 	auto &opts = ons.ons_cfg_options;
 
-	if (!FileIO::setStorageDir(opts.find("current-user-appdata") != opts.end()) ||
-	    !FileIO::makeDir(FileIO::getStorageDir(opts.find("enable-icloud") != opts.end()), nullptr, true))
+	if (!FileIO::setStorageDir(opts.find("current-user-appdata") != opts.end()))
 		performTerminate("Failed to access storage directory!");
+	const char *storagePath = FileIO::getStorageDir(opts.find("enable-icloud") != opts.end());
+	if (!FileIO::makeDir(storagePath, nullptr, true)) {
+		const int error = errno;
+		const std::string message = std::string("Failed to access storage directory!\n") + storagePath + "\n" + std::strerror(error);
+		performTerminate(message.c_str());
+	}
 
 	if (FileIO::getLogMode() == FileIO::LogMode::File) {
 		std::string log_path(FileIO::getStorageDir());

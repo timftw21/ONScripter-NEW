@@ -881,31 +881,33 @@ bool FileIO::makeDir(const std::string &path, bool recursive) {
 		// On Windows we need to convert non-ascii paths into unicode
 		// Directory creation is a not a common task, will not attempt to try the ascii version
 		auto wpath = decodeUTF8StringWide(cpath);
-		if (_wmkdir(wpath.c_str()) == 0 || errno == EEXIST)
-			return true;
+		return _wmkdir(wpath.c_str()) == 0;
 #else
 		// Assume UTF-8 support on all other systems
-		if (mkdir(cpath, 0755) == 0 || errno == EEXIST)
-			return true;
+		return mkdir(cpath, 0755) == 0;
 #endif
-		return false;
 	};
 
-	if (recursive) {
-		size_t current_pos = 0;
+	// Try the target first. Android can allow access to a game folder while
+	// denying stat/mkdir on a storage ancestor; walking from the root fails there.
+	if (make(path))
+		return true;
+	const int error = errno;
+	if (accessFile(path, FileType::Directory))
+		return true;
+	errno = error;
+	if (!recursive || error != ENOENT)
+		return false;
 
-		while ((current_pos = path.find_first_of("\\/", current_pos)) != std::string::npos) {
-			if (current_pos > 0) {
-				std::string subdir(path.begin(), path.begin() + current_pos);
-				// Firstly check whether it is a directory
-				if (!accessFile(subdir, FileType::Directory) && !make(subdir))
-					return false;
-			}
-			current_pos++;
-		}
-	}
+	// Create only missing parents, stopping as soon as one is accessible.
+	const size_t end = path.find_last_not_of("\\/");
+	if (end == std::string::npos)
+		return false;
+	const size_t parent = path.find_last_of("\\/", end);
+	if (parent == std::string::npos)
+		return false;
 
-	return make(path);
+	return makeDir(path.substr(0, parent + 1), true) && makeDir(path, false);
 }
 
 std::vector<std::string> FileIO::scanDir(const std::string &path, FileType type) {
