@@ -5,7 +5,7 @@ history belongs in Git, issues, and release notes rather than this document.
 
 ## Supported release targets
 
-- Current release: 1.9 (`20261018-new`).
+- Current release: 1.10 (`20261025-new`).
 - Windows 10 or newer, x86-64, built in MSYS2 UCRT64.
 - macOS 14 or newer, with separate Apple Silicon and Intel packages.
 - Android 11 or newer (API 30), arm64. Exercised on 15 and 16; see the

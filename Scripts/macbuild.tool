@@ -43,7 +43,7 @@ codesign --verify --deep --strict "$app"
 "$app/Contents/MacOS/onscripter-new" --version
 cp "$project_dir/LICENSE" "$project_dir/LICENSE-BSD" "$project_dir/LICENSE-GPLv2" "$package_dir/"
 cat > "$package_dir/INSTALL.txt" <<'EOF'
-ONScripter-NEW 1.9 - macOS
+ONScripter-NEW 1.10 - macOS
 
 Requires macOS 14 or newer. Use the arm64 download for Apple Silicon or the
 x86_64 download for Intel. Back up your game folder and saves, then put
