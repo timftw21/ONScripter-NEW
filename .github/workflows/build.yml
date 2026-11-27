@@ -28,14 +28,12 @@ jobs:
       - name: Install build tools
         run: brew install autoconf automake libtool cmake meson ninja nasm pkg-config
       # The dependency recipes take most of the build. Their output depends only
-      # on the recipes and the compiler, so reuse it until either changes; the
-      # weekly run still builds everything from source.
+      # on the recipes and the compiler, so reuse it until either changes.
       - name: Identify the toolchain
         id: toolchain
         run: echo "id=$(cc --version | head -1 | tr -c 'A-Za-z0-9.' '-')macos$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
       - name: Restore built dependencies
         id: deps
-        if: github.event_name != 'schedule'
         uses: actions/cache/restore@v4
         with:
           path: DerivedData/MacOSX-${{ matrix.arch }}/Dependencies/onscrlib
@@ -84,14 +82,13 @@ jobs:
             mingw-w64-ucrt-x86_64-nasm
             mingw-w64-ucrt-x86_64-pkgconf
       # See the macOS job: reuse the built dependencies until the recipes or the
-      # compiler change; the weekly run still builds everything from source.
+      # compiler change.
       - name: Identify the toolchain
         id: toolchain
         shell: msys2 {0}
         run: echo "id=gcc$(gcc -dumpfullversion)" >> "$GITHUB_OUTPUT"
       - name: Restore built dependencies
         id: deps
-        if: github.event_name != 'schedule'
         uses: actions/cache/restore@v4
         with:
           path: DerivedData/MinGW-x86_64/Dependencies/onscrlib
