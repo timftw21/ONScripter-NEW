@@ -586,14 +586,15 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
             mIsConnected = true;
             // Run directly, without GattOperation
             if (!isRegistered()) {
+                final BluetoothGatt gatt = g;
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (mGatt == null) {
+                        if (mManager == null || mGatt != gatt) {
                             return;
                         }
                         try {
-                            mGatt.discoverServices();
+                            gatt.discoverServices();
                         } catch (SecurityException e) {
                             handlePermissionDenied(e);
                         }

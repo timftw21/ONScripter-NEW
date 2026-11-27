@@ -441,27 +441,25 @@ it and bridges back over JNI. Current size:
 
 | Vendored SDL3 | Lines | `native` methods |
 | --- | --- | --- |
-| `SDLActivity.java` | 2260 | 44 |
-| `SDLControllerManager.java` | 1010 | 10 |
-| `HIDDeviceBLESteamController.java` | 829 | 0 |
-| `HIDDeviceManager.java` | 698 | 8 |
-| `SDLSurface.java` | 464 | 0 |
-| `HIDDeviceUSB.java` | 354 | 0 |
+| `SDLActivity.java` | 2286 | 44 |
+| `SDLControllerManager.java` | 1021 | 10 |
+| `HIDDeviceBLESteamController.java` | 912 | 0 |
+| `HIDDeviceManager.java` | 730 | 8 |
+| `SDLSurface.java` | 426 | 0 |
+| `HIDDeviceUSB.java` | 379 | 0 |
 | `SDLInputConnection.java` | 135 | 2 |
-| `SDLAudioManager.java` | 126 | 3 |
+| `SDLAudioManager.java` | 130 | 3 |
 | `SDL.java` | 90 | 0 |
 | `SDLDummyEdit.java` | 65 | 0 |
-| `SDLSensorManager.java` | 31 | 0 |
+| `SDLSensorManager.java` | 72 | 0 |
 | `HIDDevice.java` | 21 | 0 |
 
-That vendored half is ~6080 lines and 67 native entry points covering the
+That vendored half is ~6270 lines and 67 native entry points covering the
 rendering surface, touch/key/mouse/gamepad input, sensors, IME and soft
 keyboard, audio device lifecycle, USB and Bluetooth HID, clipboard, permissions,
-and translation of the activity lifecycle into SDL events. Treat it as a port
-layer, not glue. Replace it wholesale on an SDL upgrade rather than editing
-it -- carrying forward the one intentional local patch, the message-box
-completion guard in `SDLActivity`, which releases a native thread blocked on
-a dialog when the activity is torn down.
+and translation of the activity lifecycle into SDL events. On an SDL upgrade,
+merge the matching upstream Java sources while preserving the project's
+activity, Back navigation, dialog teardown and Bluetooth permission handling.
 
 | Project-owned | Lines | Role |
 | --- | --- | --- |
@@ -522,7 +520,7 @@ vendored Java sources are pinned to the exact version they came from.
 ```java
 private static final int SDL_MAJOR_VERSION = 3;
 private static final int SDL_MINOR_VERSION = 4;
-private static final int SDL_MICRO_VERSION = 10;
+private static final int SDL_MICRO_VERSION = 20;
 ...
 String version = nativeGetVersion();
 if (!version.equals(expected_version))
@@ -530,7 +528,7 @@ if (!version.equals(expected_version))
 ```
 
 Those constants must match `pkgver` in `Dependencies/pkgs/SDL3.pkgbuild`
-(currently `3.4.10`). Bumping SDL3 therefore means re-vendoring the Java sources
+(currently `3.4.20`). Bumping SDL3 therefore means re-vendoring the Java sources
 from the matching SDL release and updating these constants, or the app refuses
 to start with a mismatch dialog.
 
