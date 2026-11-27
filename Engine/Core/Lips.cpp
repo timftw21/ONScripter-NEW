@@ -182,13 +182,13 @@ void ONScripter::loadLips(int channel) {
 	getChunkParams(chunk_size, max_value);
 
 	uint32_t buf_len = wave_sample[channel]->chunk->alen;
-	if (buf_len > LIPS_AUDIO_RATE * MAX_SOUND_LENGTH * chunk_size) {
+	if (buf_len > static_cast<uint64_t>(audio_format.freq) * MAX_SOUND_LENGTH * chunk_size) {
 		sendToLog(LogLevel::Error, "The file is too big!\n");
 		return;
 	}
 
 	uint32_t i{0};
-	int vc{0}, count{0};
+	int vc{0}, phase{0};
 	double peak{0};
 	Lips &lipdata = lipsChannels[channel].get().lipsData;
 
@@ -197,10 +197,10 @@ void ONScripter::loadLips(int channel) {
 		if (v > peak)
 			peak = v;
 
-		count++;
+		phase += CHUNKS_PER_SECOND;
 		i += chunk_size;
 
-		if (count >= SAMPLES_PER_CHUNK || i >= buf_len) {
+		if (phase >= audio_format.freq || i >= buf_len) {
 			peak /= max_value;
 
 			lipdata.seq[vc] = 2;
@@ -222,7 +222,7 @@ void ONScripter::loadLips(int channel) {
 
 			vc++;
 
-			count -= SAMPLES_PER_CHUNK;
+			phase -= audio_format.freq;
 			peak = 0;
 		}
 	} while (i < buf_len);

@@ -21,6 +21,7 @@
 #include "Support/FileIO.hpp"
 #include "Support/SDLCompat.hpp"
 
+#include <charconv>
 #include <cstring>
 #include <stdexcept>
 
@@ -54,6 +55,17 @@ const int DEFAULT_WM_ICON_H = 32;
 const int DEFAULT_FONT_SIZE = 26;
 
 namespace {
+
+int audioConfigNumber(const std::string &value, const char *option, int minimum, int maximum, int fallback) {
+	int number{};
+	const char *end = value.data() + value.size();
+	const auto result = std::from_chars(value.data(), end, number);
+	if (result.ec == std::errc{} && result.ptr == end && number >= minimum && number <= maximum)
+		return number;
+	sendToLog(LogLevel::Warn, "Invalid %s value '%s' (expected %d to %d). Using the default.\n",
+	          option, value.c_str(), minimum, maximum);
+	return fallback;
+}
 
 #ifdef ONS_DISCORD_PRESENCE_SUPPORTED
 bool configValueDisablesDiscordPresence(const std::string &value) {
@@ -562,6 +574,30 @@ void ONScripter::initSDL() {
 	          lowLatencyAudio ? "on" : "off", lowLatencyDetail.c_str());
 #endif
 
+	// SDL selects its driver during audio subsystem initialization.
+	auto driver = ons_cfg_options.find("audiodriver");
+#if defined(ONS_USE_SDL3)
+	auto envDriver = user_cfg_options.find(SDL_HINT_AUDIO_DRIVER);
+	if (driver != ons_cfg_options.end()) {
+#ifdef WIN32
+		// SDL3 removed WinMM. Old saved --waveout-audio configurations used it.
+		if (driver->second == "winmm")
+			sendToLog(LogLevel::Warn, "WinMM is unavailable in SDL3. Using the default audio driver.\n");
+		else
+#endif
+			SDL_SetHint(SDL_HINT_AUDIO_DRIVER, driver->second.c_str());
+	} else if (envDriver != user_cfg_options.end()) {
+		SDL_SetHint(SDL_HINT_AUDIO_DRIVER, envDriver->second.c_str());
+	}
+#else
+	if (driver != ons_cfg_options.end())
+		onsSDLSetEnv("SDL_AUDIODRIVER", driver->second.c_str(), true);
+#ifdef WIN32
+	else
+		onsSDLSetEnv("SDL_AUDIODRIVER", "directsound", false);
+#endif
+#endif
+
 	if (!onsSDLInitSubSystem(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO)) {
 		errorAndExit("Couldn't initialize SDL", SDL_GetError(), "Init Error", true);
 		return; //dummy
@@ -803,6 +839,9 @@ void ONScripter::initSDL() {
 	default_audio_format.freq     = DEFAULT_AUDIO_RATE;
 	default_audio_format.channels = MIX_DEFAULT_CHANNELS;
 
+	if (auto rate = ons_cfg_options.find("audio-freq"); rate != ons_cfg_options.end())
+		default_audio_format.freq = audioConfigNumber(rate->second, "audio-freq", 8000, 192000, DEFAULT_AUDIO_RATE);
+
 	auto defaultFormat = ons_cfg_options.find("audioformat");
 	if (defaultFormat != ons_cfg_options.end()) {
 		if (defaultFormat->second == "s8")
@@ -865,31 +904,16 @@ void ONScripter::reopenAudioOnMismatch(const SDL_AudioSpec &spec) {
 }
 
 void ONScripter::openAudio(const SDL_AudioSpec &spec) {
-	auto it = ons_cfg_options.find("audiobuffer");
-	if (it != ons_cfg_options.end()) {
-		auto kbyte_size = std::stoi(it->second);
-
-		if (kbyte_size > 0 && kbyte_size <= 16 && kbyte_size % 2 == 0) {
-			//only allow powers of 2 as buffer sizes
-			audiobuffer_size = kbyte_size * 1024;
-			sendToLog(LogLevel::Info, "Using audiobuffer of %d bytes\n", audiobuffer_size);
-		} else {
-			std::snprintf(script_h.errbuf, MAX_ERRBUF_LEN, "Invalid audiobuffer size %dk"
-			                                               " - using prior size of %d bytes",
-			              kbyte_size, audiobuffer_size);
-			errorAndCont(script_h.errbuf, nullptr, "Config Issue", true);
-		}
-	}
-
-	it = ons_cfg_options.find("audiodriver");
-	if (it != ons_cfg_options.end()) {
-		onsSDLSetEnv("SDL_AUDIODRIVER", it->second.c_str(), true);
-	} else {
-#ifdef WIN32
-		// WASAPI driver that appeared in 2.0.7 is total garbage
-		onsSDLSetEnv("SDL_AUDIODRIVER", "directsound", false);
+#if defined(ONS_USE_SDL3)
+	constexpr int defaultFrames = 0; // Let SDL select the device period unless explicitly configured.
+#else
+	constexpr int defaultFrames = DEFAULT_AUDIOBUF;
 #endif
-	}
+	int frames = defaultFrames;
+	if (auto it = ons_cfg_options.find("audio-buffer"); it != ons_cfg_options.end())
+		frames = audioConfigNumber(it->second, "audio-buffer", 1, 16384, defaultFrames);
+	else if (auto legacy = ons_cfg_options.find("audiobuffer"); legacy != ons_cfg_options.end())
+		frames = 1024 * audioConfigNumber(legacy->second, "audiobuffer", 1, 16, defaultFrames / 1024);
 
 	// Initially try to open a device not allowing anything to change.
 	// Disabling frequency changes fixes the terrible click noise on Windows after SDL 2.0.7.
@@ -897,9 +921,9 @@ void ONScripter::openAudio(const SDL_AudioSpec &spec) {
 	// The cause appears to be totally broken SDL audio device abilities detection, which appeared in 2.0.6.
 	// Otherwise ask SDL_mixer to open a device with the default channel format (S16), and in the end
 	// go with whatever the defaults are to fallback in case of issues.
-	if (Mix_OpenAudioDevice(spec.freq, spec.format, spec.channels, audiobuffer_size, nullptr, 0) < 0 &&
-		Mix_OpenAudioDevice(spec.freq, MIX_DEFAULT_FORMAT, spec.channels, audiobuffer_size, nullptr, 0) < 0 &&
-	    Mix_OpenAudio(spec.freq, spec.format, spec.channels, audiobuffer_size) < 0) {
+	if (Mix_OpenAudioDevice(spec.freq, spec.format, spec.channels, frames, nullptr, 0) < 0 &&
+	    Mix_OpenAudioDevice(spec.freq, MIX_DEFAULT_FORMAT, spec.channels, frames, nullptr, 0) < 0 &&
+	    Mix_OpenAudio(spec.freq, spec.format, spec.channels, frames) < 0) {
 		errorAndCont("Couldn't open audio device!", SDL_GetError(), "Init Error", true);
 		audio_open_flag = false;
 	} else {

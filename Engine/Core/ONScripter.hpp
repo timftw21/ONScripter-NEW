@@ -82,10 +82,8 @@ enum {
 	MIX_CACHE_CHANNEL_ASYNC
 };
 
-const int LIPS_AUDIO_RATE        = 48000;
 const int CHUNKS_PER_SECOND      = 20;
 const int MAX_SOUND_LENGTH       = 180; // in seconds
-const int SAMPLES_PER_CHUNK      = DEFAULT_AUDIO_RATE / CHUNKS_PER_SECOND;
 const double MS_PER_CHUNK        = (1.0 / CHUNKS_PER_SECOND * 1000);
 const int BREAKUP_CELLSEPARATION = 16;
 const int BREAKUP_CELLWIDTH      = 24;
@@ -761,7 +759,6 @@ private:
 	// ----------------------------------------
 	// start-up options
 	bool cdaudio_flag{false};
-	int audiobuffer_size{DEFAULT_AUDIOBUF};
 	bool match_bgm_audio_flag{false};
 	char *registry_file{nullptr};
 	char *dll_file{nullptr};

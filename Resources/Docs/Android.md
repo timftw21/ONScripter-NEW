@@ -230,6 +230,18 @@ release packaging; it stages a copy of this same Gradle project under
 
 ### Troubleshooting
 
+For audio crackling, set `audio-buffer=4096` in the game's `ons.cfg` and
+restart the app. By default, SDL chooses the callback size. A larger
+buffer gives the mixer more time to deliver sound and increases
+playback latency. The legacy spelling `audiobuffer=4` also requests 4096
+frames. Use one spelling per config.
+
+`audio-freq=48000` and `audioformat=f32` are the default rate and format
+requests. To select a backend, use `audiodriver=aaudio` or
+`audiodriver=openslES`. The `Audio device` line in the startup log shows
+which driver opened, the requested settings, and the format and callback
+size SDL obtained. The device can choose a different format or buffer size.
+
 | Symptom | Cause and fix |
 | --- | --- |
 | Build fails in `:syncEngineLibs` with `No engine binary found` | No engine binary yet. Do step 1. |
@@ -1485,10 +1497,10 @@ speaker (2026-10-19, title screen with music):
 With low latency on, the Pad's ~142 ms is SDL's buffer (3 slots of 20 ms, 2
 kept full: 40 ms), AAudio's stream buffer (2 × 20 ms, full: 40 ms), the fast
 mixer (42.7 ms) and about 20 ms in the vendor's path; the Redmi's fast mixer
-is 21 ms. Both 40 ms buffers follow SDL's 20 ms default period, because the
-SDL_mixer compatibility layer drops the engine's `--audiobuffer` size
-(`Mix_OpenAudioDevice` ignores `chunksize`). Off, the Pad routes the game to
-its primary output and the total barely moves. The Redmi routes it to the
+is 21 ms. Both 40 ms buffers in that build followed SDL's 20 ms default
+period because the compatibility layer discarded the requested buffer size.
+With low latency off, the Pad routed the game to
+its primary output and the total barely moved. The Redmi routed it to the
 deep-buffer output (`AUDIO_OUTPUT_FLAG_DEEP_BUFFER`, 40 ms periods, ~147 ms
 hardware writes), which roughly doubles the lead. Which output a stream gets
 is the device's policy, not the engine's.

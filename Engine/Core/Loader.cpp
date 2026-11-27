@@ -87,7 +87,7 @@ void *__wrap_SDL_LoadObject(const char *sofile) {
 	FileIO::prepareConsole(150, 30);
 	printf("Usage: onscripter-new [option ...]\n");
 	printf("     --cdaudio                    use CD audio if available\n");
-#ifdef WIN32
+#if defined(WIN32) && !defined(ONS_USE_SDL3)
 	printf("     --waveout-audio              use the windows waveform audio driver (instead of Direct Sound)\n");
 #endif
 	printf("     --match-audiodevice-to-bgm   reset audio to match bgm specs\n");
@@ -125,8 +125,10 @@ void *__wrap_SDL_LoadObject(const char *sofile) {
 	printf("     --enable-wheeldown-advance   advance the text on mouse wheeldown event\n");
 	printf("     --set-tag-page-origin-to-1   syntax option for setting 'gettaglog' origin to 1 instead of 0\n");
 	printf("     --answer-dialog-with-yes-ok  have 'yesnobox' and 'okcancelbox' give 'yes/ok' result\n");
-	printf("     --audiodriver dev            set the SDL_AUDIODRIVER to dev\n");
-	printf("     --audiobuffer size           set the audio buffer size in kB (default: 2)\n");
+	printf("     --audiodriver dev            select the SDL audio driver\n");
+	printf("     --audio-buffer frames        request an audio buffer size in sample frames (up to 16384)\n");
+	printf("     --audiobuffer size           legacy buffer size in units of 1024 sample frames (up to 16)\n");
+	printf("     --audio-freq hz              request an audio sample rate in Hz (default: 48000)\n");
 	printf("     --audioformat format         set the audio format (choose from s8, u8, s16, u16, s32, f32)\n");
 #ifdef DROID
 	printf("     --audio-low-latency state    pass 0/1 or true/false to enable/disable AAudio low-latency mode (default: on)\n");
@@ -226,10 +228,16 @@ static void parseOptions(int argc, char **argv, bool &hasArchivePath, bool fromO
 				argc--;
 				argv++;
 				ons.ons_cfg_options["audiodriver"] = argv[0];
-			} else if (!std::strcmp(argv[0] + 1, "-audiobuffer")) {
+			} else if (!std::strcmp(argv[0], "--audiobuffer") || !std::strcmp(argv[0], "--audio-buffer")) {
+				const bool legacy = !std::strcmp(argv[0], "--audiobuffer");
+				ons.ons_cfg_options.erase(legacy ? "audio-buffer" : "audiobuffer");
 				argc--;
 				argv++;
-				ons.ons_cfg_options["audiobuffer"] = argv[0];
+				ons.ons_cfg_options[legacy ? "audiobuffer" : "audio-buffer"] = argv[0];
+			} else if (!std::strcmp(argv[0], "--audio-freq")) {
+				argc--;
+				argv++;
+				ons.ons_cfg_options["audio-freq"] = argv[0];
 			} else if (!std::strcmp(argv[0] + 1, "-audioformat")) {
 				argc--;
 				argv++;

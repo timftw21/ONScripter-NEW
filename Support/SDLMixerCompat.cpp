@@ -11,6 +11,8 @@
 
 #if defined(ONS_USE_SDL3)
 
+#include "Support/FileDefs.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -189,7 +191,7 @@ int Mix_OpenAudio(int frequency, SDL_AudioFormat format, int channelCount, int c
 	return Mix_OpenAudioDevice(frequency, format, channelCount, chunksize, nullptr, 0);
 }
 
-int Mix_OpenAudioDevice(int frequency, SDL_AudioFormat format, int channelCount, int /*chunksize*/, const char * /*device*/, int /*allowed_changes*/) {
+int Mix_OpenAudioDevice(int frequency, SDL_AudioFormat format, int channelCount, int chunksize, const char * /*device*/, int /*allowed_changes*/) {
 	Mix_CloseAudio();
 
 	if (!MIX_Init())
@@ -200,6 +202,7 @@ int Mix_OpenAudioDevice(int frequency, SDL_AudioFormat format, int channelCount,
 	requested.format   = format;
 	requested.channels = channelCount;
 
+	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, chunksize > 0 ? std::to_string(chunksize).c_str() : nullptr);
 	mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &requested);
 	if (!mixer) {
 		MIX_Quit();
@@ -207,6 +210,15 @@ int Mix_OpenAudioDevice(int frequency, SDL_AudioFormat format, int channelCount,
 	}
 
 	MIX_GetMixerFormat(mixer, &mixerSpec);
+	SDL_AudioSpec deviceSpec{};
+	int deviceFrames{};
+	if (SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &deviceSpec, &deviceFrames)) {
+		const char *frameHint = SDL_GetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES);
+		sendToLog(LogLevel::Info, "Audio device: %s, %d Hz %s, %d channels, %d frames per callback "
+		                          "(requested %d Hz %s, %s frames)\n",
+		          SDL_GetCurrentAudioDriver(), deviceSpec.freq, SDL_GetAudioFormatName(deviceSpec.format),
+		          deviceSpec.channels, deviceFrames, frequency, SDL_GetAudioFormatName(format), frameHint ? frameHint : "auto");
+	}
 	musicTrack = MIX_CreateTrack(mixer);
 	if (!musicTrack) {
 		Mix_CloseAudio();
