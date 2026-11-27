@@ -177,6 +177,7 @@ by that project.
 
 `ONScripter-NEW` builds on the work of:
 
+- timftw21 (Derek Timm) for originally creating ONScripter-NEW
 - Ogapee and the original ONScripter contributors
 - “Uncle” Mion Sonozaki and ONScripter-RU contributors
 - Umineko Project
