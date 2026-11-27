@@ -27,10 +27,30 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install build tools
         run: brew install autoconf automake libtool cmake meson ninja nasm pkg-config
+      # The dependency recipes take most of the build. Their output depends only
+      # on the recipes and the compiler, so reuse it until either changes; the
+      # weekly run still builds everything from source.
+      - name: Identify the toolchain
+        id: toolchain
+        run: echo "id=$(cc --version | head -1 | tr -c 'A-Za-z0-9.' '-')macos$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
+      - name: Restore built dependencies
+        id: deps
+        if: github.event_name != 'schedule'
+        uses: actions/cache/restore@v4
+        with:
+          path: DerivedData/MacOSX-${{ matrix.arch }}/Dependencies/onscrlib
+          key: deps-macos-${{ matrix.arch }}-${{ github.event.repository.name }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('Dependencies/**') }}
       - name: Configure
         run: ./configure --release-build --std=gnu++23 --with-werror
       - name: Build
-        run: make -k -j2
+        run: make -k -j"$(sysctl -n hw.ncpu)"
+      - name: Save built dependencies
+        if: always() && steps.deps.outputs.cache-primary-key != '' && steps.deps.outputs.cache-hit != 'true' && hashFiles(format('DerivedData/MacOSX-{0}/Dependencies/onscrlib/.pkgs/onscrlib', matrix.arch)) != ''
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: DerivedData/MacOSX-${{ matrix.arch }}/Dependencies/onscrlib
+          key: ${{ steps.deps.outputs.cache-primary-key }}
       - name: Native regression tests
         run: |
           cmake -S Tests -B DerivedData/tests -G Ninja
@@ -63,12 +83,32 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-nasm
             mingw-w64-ucrt-x86_64-pkgconf
+      # See the macOS job: reuse the built dependencies until the recipes or the
+      # compiler change; the weekly run still builds everything from source.
+      - name: Identify the toolchain
+        id: toolchain
+        shell: msys2 {0}
+        run: echo "id=gcc$(gcc -dumpfullversion)" >> "$GITHUB_OUTPUT"
+      - name: Restore built dependencies
+        id: deps
+        if: github.event_name != 'schedule'
+        uses: actions/cache/restore@v4
+        with:
+          path: DerivedData/MinGW-x86_64/Dependencies/onscrlib
+          key: deps-windows-ucrt64-${{ github.event.repository.name }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('Dependencies/**') }}
       - name: Configure
         shell: msys2 {0}
         run: ./configure --release-build --std=gnu++23 --with-werror
       - name: Build
         shell: msys2 {0}
-        run: make -j2
+        run: make -j"$(nproc)"
+      - name: Save built dependencies
+        if: always() && steps.deps.outputs.cache-primary-key != '' && steps.deps.outputs.cache-hit != 'true' && hashFiles('DerivedData/MinGW-x86_64/Dependencies/onscrlib/.pkgs/onscrlib') != ''
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: DerivedData/MinGW-x86_64/Dependencies/onscrlib
+          key: ${{ steps.deps.outputs.cache-primary-key }}
       - name: Native regression tests
         shell: msys2 {0}
         run: |
