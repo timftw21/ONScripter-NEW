@@ -12,6 +12,7 @@
 #if defined(ONS_USE_SDL3)
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cstring>
 #include <limits>
@@ -71,9 +72,23 @@ ChannelState *getChannel(int channel) {
 	return &channels[channel];
 }
 
-void clearChannelInput(ChannelState &channel) {
+// The track being stopped by clearChannelInput without a finished callback.
+// SDL3_mixer calls trackStopped synchronously from MIX_StopTrack, so a replace
+// in Mix_PlayChannel reported the old sound as finished. The engine answers a
+// finished channel by freeing whatever chunk is on it by the time it reads the
+// event -- the new one, still playing -- which SDL3_mixer was streaming from by
+// reference. Atomic because a natural end can land on the mixer thread mid-stop.
+std::atomic<MIX_Track *> silentStopTrack{nullptr};
+
+// notify is false when the stop is not the sound ending: a replace, a free, or
+// the channel going away. Mix_HaltChannel keeps notifying, as SDL2_mixer did.
+void clearChannelInput(ChannelState &channel, bool notify = true) {
 	if (channel.track) {
+		if (!notify)
+			silentStopTrack.store(channel.track);
 		MIX_StopTrack(channel.track, 0);
+		if (!notify)
+			silentStopTrack.store(nullptr);
 		MIX_SetTrackAudio(channel.track, nullptr);
 		MIX_SetTrackAudioStream(channel.track, nullptr);
 	}
@@ -95,6 +110,8 @@ void SDLCALL trackStopped(void * /*userdata*/, MIX_Track *track) {
 	for (auto &channel : channels) {
 		if (channel.track == track) {
 			channel.chunk = nullptr;
+			if (silentStopTrack.load() == track)
+				return;
 			if (channelFinishedCallback)
 				channelFinishedCallback(channel.index);
 			return;
@@ -260,7 +277,7 @@ int Mix_AllocateChannels(int numchans) {
 	numchans = std::max(0, numchans);
 	if (numchans < static_cast<int>(channels.size())) {
 		for (int i = numchans; i < static_cast<int>(channels.size()); ++i) {
-			clearChannelInput(channels[i]);
+			clearChannelInput(channels[i], false);
 			MIX_DestroyTrack(channels[i].track);
 		}
 		channels.resize(numchans);
@@ -421,6 +438,13 @@ Mix_Chunk *Mix_QuickLoad_RAW(Uint8 *mem, Uint32 len) {
 void Mix_FreeChunk(Mix_Chunk *chunk) {
 	if (!chunk)
 		return;
+	// SDL2_mixer halted every channel still playing a chunk before freeing it,
+	// and the engine relies on that: it pauses a channel and drops the sound
+	// in several places. SDL3_mixer streams raw audio by reference from abuf,
+	// so a track left holding it would read freed memory on the mixer thread.
+	for (auto &state : channels)
+		if (state.chunk == chunk)
+			clearChannelInput(state, false);
 	if (chunk->audio)
 		MIX_DestroyAudio(chunk->audio);
 	if (chunk->allocated && chunk->abuf)
@@ -455,7 +479,8 @@ int Mix_PlayChannel(int channel, Mix_Chunk *chunk, int loops) {
 	if (!state || !state->track)
 		return -1;
 
-	clearChannelInput(*state);
+	// Replacing the sound is not the old one finishing; see silentStopTrack.
+	clearChannelInput(*state, false);
 	state->chunk = chunk;
 
 	bool streamInput = false;
