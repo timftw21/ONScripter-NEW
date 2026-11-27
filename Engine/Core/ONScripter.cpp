@@ -1348,11 +1348,14 @@ void ONScripter::updateDiscordPresence() {
 	activity.largeImage = "https://raw.githubusercontent.com/timftw21/onscripter-new/master/Resources/Bundle/Images.xcassets/AppIcon-mac.appiconset/512x512.png";
 	activity.largeText  = "Umineko Project";
 
+	// The subtitle between the tildes, in whatever language the script set the
+	// caption in. Matching the English titles left every translation stuck on
+	// "Starting up": the Russian caption is "~Рондо ведьмы и рассудка~".
 	const char *title = wm_title_string && wm_title_string[0] ? wm_title_string : DEFAULT_WM_TITLE;
-	if (std::strstr(title, "Rondo of the Witch and Reasoning"))
-		activity.state = "~Rondo of the Witch and Reasoning~";
-	else if (std::strstr(title, "Nocturne of Truth and Illusions"))
-		activity.state = "~Nocturne of Truth and Illusions~";
+	const char *open  = std::strchr(title, '~');
+	const char *close = open ? std::strchr(open + 1, '~') : nullptr;
+	if (close && close > open + 1)
+		activity.state.assign(open, close + 1);
 	else
 		activity.state = "~Starting up~";
 
