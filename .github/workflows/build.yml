@@ -1,10 +1,17 @@
 name: build
 
 on:
+  # A feature branch is built through its pull request; building its pushes too
+  # ran every commit twice. master and release tags still build on push, which
+  # also seeds the dependency cache pull requests restore from.
   push:
+    branches: [master]
+    tags: ['v*']
   pull_request:
   schedule:
     - cron: "17 4 * * 0"
+  # Run a branch by hand from the Actions tab without opening a pull request.
+  workflow_dispatch:
 
 permissions:
   contents: read
